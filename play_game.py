@@ -7,9 +7,28 @@ def is_neighbor(x_i, x_j) # for pursuer-pursuer
 
 def is_within_reach(x_i, y_k) # for pursuer-evader
 
+def is_taken(y_k, I)
+    return size(i[y_k][1])==1
+
 def tb(list(int)) #input: list of pursuers up for tie break
     # pick one of the pursuers randomly
 
+def intialization()
+    # I = list of pairs [(I^a(list: int), I^t(list: int)), ...]
+    # Ex:
+    # I[1][1]: pursuer 1's I^a list
+    # I[4][2]: pursuer 4's I^t list 
+    
+def task_assigment():
+    for every pursuer 
+        Select evader s_i among those that satisfy 2a
+        if I[s_i][] = not taken
+            I[s_i]][1] =
+            update C_i and N_i 
+            I[s_i]][2] =
+        else if tie break 
+            tie break
+        
 def play_game():
     print("Playing...")
     n = 4 # number of pursuers (0 to n-1)
@@ -29,11 +48,14 @@ def play_game():
         # Assign pursuer-evader pairs
         # Output: 
         # A = [(int: P, int: E), ...]
+        A = [(-1,-1) for i in range(n)]
         # I = list of pairs [(I^a(list: int), I^t(list: int)), ...]
         # Ex:
         # I[0][0]: pursuer 0's I^a list
         # I[4][1]: pursuer 4's I^t list 
-        
+        I = [([i for i in range(m)],[-1 for i in range(m)]) for j in range(n)]
+        intialization()
+        task_assigment()
         # Control inputs u are computed
         # Ui = [tuple(float, float)] # 2D control inputs for pursuers
         # Uk = [tuple(float, float)] # 2D control inputs for evaders
