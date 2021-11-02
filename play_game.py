@@ -1,6 +1,7 @@
 import numpy as np
 import math
 import assign_pairs
+import numpy as np
 
 # Helper functions
 def is_neighbor(x_i, x_j) # for pursuer-pursuer
@@ -12,17 +13,12 @@ def is_taken(y_k, I)
 
 def tb(list(int)) #input: list of pursuers up for tie break
     # pick one of the pursuers randomly
-
-def intialization()
-    # I = list of pairs [(I^a(list: int), I^t(list: int)), ...]
-    # Ex:
-    # I[1][1]: pursuer 1's I^a list
-    # I[4][2]: pursuer 4's I^t list 
-    
-def task_assigment():
-    for every pursuer 
+ 
+def task_assigment(A,I):
+    #for every pursuer 
+    for pi in range(len(I))
         Select evader s_i among those that satisfy 2a
-        if I[s_i][] = not taken
+        if !is_taken(s_i, I[s_i][])
             I[s_i]][1] =
             update C_i and N_i 
             I[s_i]][2] =
@@ -48,14 +44,23 @@ def play_game():
         # Assign pursuer-evader pairs
         # Output: 
         # A = [(int: P, int: E), ...]
-        A = [(-1,-1) for i in range(n)]
+        
         # I = list of pairs [(I^a(list: int), I^t(list: int)), ...]
         # Ex:
         # I[0][0]: pursuer 0's I^a list
         # I[4][1]: pursuer 4's I^t list 
-        I = [([i for i in range(m)],[-1 for i in range(m)]) for j in range(n)]
-        intialization()
-        task_assigment()
+        A = [(-1,-1) for i in range(n)]
+        #I = [([i for i in range(m)],[-1 for i in range(m)]) for j in range(n)]
+        I = np.empty((n,),dtype=object)
+        for i,v in enumerate(I): 
+            I[i]=[[k for k in range(m)],v]
+        
+
+        l=0
+        for v in I: 
+            v.append(l)
+            l+=1
+        task_assigment(I, A)
         # Control inputs u are computed
         # Ui = [tuple(float, float)] # 2D control inputs for pursuers
         # Uk = [tuple(float, float)] # 2D control inputs for evaders
@@ -84,7 +89,7 @@ def play_game():
         # Current time
         t = t + dt
         
-        
+
     
 
 if __name__ == "__main__":
