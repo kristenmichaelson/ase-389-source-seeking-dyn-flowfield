@@ -7,6 +7,7 @@ import numpy as np
 def is_neighbor(x_i, x_j) # for pursuer-pursuer
 
 def is_within_reach(x_i, y_k) # for pursuer-evader
+    abs(x_i-y_k)^2 < δ 
 
 def is_taken(y_k, I)
     return size(i[y_k][1])==1
