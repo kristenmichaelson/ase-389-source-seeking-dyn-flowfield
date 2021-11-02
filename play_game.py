@@ -26,6 +26,21 @@ def task_assigment(A,I):
         else if tie break 
             tie break
         
+#This is to generate some velocity field
+def vel_form(centers, dim, list_):
+    u, v = np.zeros((dim, dim)), np.zeros((dim, dim))
+    x, y = np.meshgrid(np.linspace(0,dim,dim+1),np.linspace(0,dim,dim+1))
+    for i in range(len(centers)):
+        c1, c2 = centers[i]
+        cen = (7, 7)
+        u1 = -(x-c1)/((x-c1)**2 + (y-c2)**2)**(32/4)
+        u1[c2, c1] = 0
+        v1 = -(y-c2)/((x-c1)**2 + (y-c2)**2)**(32/4)
+        v1[c2, c1] = 0
+        u, v = u + list_[i]*u1[1:, 1:].copy(), v + list_[i]*v1[1:, 1:].copy()
+    return u, v
+    
+
 def play_game():
     print("Playing...")
     n = 4 # number of pursuers (0 to n-1)
