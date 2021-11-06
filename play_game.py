@@ -5,13 +5,14 @@ import random
 import pygame
 
 class Evader():
-    def __init__(self, x, y, size=10):
+    def __init__(self, x, y, id, size=10):
         self.x = x
         self.y = y
         self.size = size # px
         self.colour = (0, 0, 255)
         self.thickness = 1 # px
         self.speed = 0.25
+        self.ID = id
         # self.angle = 0
 
     ## Helper function to visualize 
@@ -42,6 +43,9 @@ class Pursuer():
         self.size = size
         self.colour = (255, 0, 0)
         self.thickness = 1
+        self.capturing_radius = 10
+        self.I_a = list(range(m))
+        self.I_t = []
 
     ## Helper function to visualize 
     def display(self, screen, scale, w):
@@ -63,19 +67,34 @@ class Pursuer():
     def move(self, vx, vy, dt):
         self.x += dt * vx
         self.y += dt * vy
+    
+    # check if the pursuer can capture assigned evader
+    def is_within_reach(self, ex, ey) 
+        # tune the parameter r 
+        return abs([self.x self.y] - [ex ey])^2 <= capturing_radius #*exp(-a*(t-t0)))^2
 
+    # Neighbours to achieve local coordination among the pursuers
+    def is_neighbor(self, px, py)
+        abs([self.x self.y] - [px py])^2 <= coordination_radius #*exp(-a*(t-t0)))^2
 
-# Helper functions
-def is_neighbor(x_i, x_j) # for pursuer-pursuer
+    def is_assigned(self)
+        return len(self.I_a) == 1
 
-def is_within_reach(x_i, y_k) # for pursuer-evader
-    abs(x_i-y_k)^2 < δ
+    def evader_assigned(self)
+        return self.I_a
 
-def is_taken(y_k, I)
-    return size(i[y_k][1])==1
+    def evader_assignment(self, ex, ey, eid)
+        
+        # capture move or velocity to make sure it stays within reach and capturability
+        self.I_a = eid 
+        # Do we need to store position of evader as well or just the ID 
 
-def tb(list(int)) #input: list of pursuers up for tie break
-    # pick one of the pursuers randomly
+     #input: list of pursuers up for tie break
+     # pick one of the pursuers randomly
+    def tb(self, list(Evader))
+        
+
+    
 
 def task_assigment(A,I):
     #for every pursuer 
@@ -161,7 +180,7 @@ def play_game():
         a = (2 * math.pi / m) * ii
         x = R * np.cos(a)
         y = R * np.sin(a)
-        e = Evader(x, y)
+        e = Evader(x, y, ii)
         E.append(e)
 
     dt = 0.01
@@ -193,24 +212,18 @@ def play_game():
             l+=1
         task_assigment(I, A)
         
-        '''
-        E = evader_velocities(m)
+        # evaders that satisfy e2a
+        e2a = []
+        for p_ind in range(n)
+            for e_ind in range(m)
+                if (P[p_ind].is_within_reach(E[e_ind].x, E[e_ind].y) & (len(P[p_ind]) > 1) & (E[e_ind].ID in P[p_ind].I_a)
+                    e2a.append(E[e_ind])
 
-        Ui = [(0,0) for pi in range(n)]
-        a = 1.0 # have to tune these (see Thm 1, Zavlanos and Pappas 2007)
-        R = 1.0
-        K = 1.0
-        for (p,e) in A:
-            px = X[p][0]
-            py = X[p][1]
-            ex = Y[e][0]
-            ey = Y[e][1]
-            gamma = math.sqrt((px - ex) ** 2 + (py - ey) ** 2)
-            r = R * math.exp(-a * (t - t0))
-            beta = r ** 2 - gamma ** 2
-            Ui[p][0] = - K * (1 / beta ** 2) * 2 * (px - ex)
-            Ui[p][1] = - K * (1 / beta ** 2) * 2 * (py - ey)
-        '''
+            if len(e2a) > 1
+                P[p_ind].tiebreak(e2a) 
+            else if len(e2a) == 1
+                P[p_ind].evader_assignment(e2a[1].x,e2a[1].y,e2a[1].ID)
+
         # Integrate dynamics
         for p_ind, e_ind in A:
             e = E[e_ind]
