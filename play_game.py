@@ -5,14 +5,20 @@ import random
 import pygame
 
 class Evader():
-    def __init__(self, x, y, size=10):
+    def __init__(self, x, y,angle,speed,size=10):
         self.x = x
         self.y = y
         self.size = size # px
         self.colour = (0, 0, 255)
         self.thickness = 1 # px
-        self.speed = 0.25
-        # self.angle = 0
+        self.speed = speed
+        self.angle = angle
+
+
+    def m(self):
+        x = int(np.cos(self.angle) * 100) + 300
+        y = int(np.sin(self.angle) * 100) + 300
+        return x,y
 
     ## Helper function to visualize 
     def display(self, screen, scale, w):
@@ -27,12 +33,12 @@ class Evader():
 
     ## Evader movement defined by kinematic model
     def move(self, vx, vy, dt):
-        print(self.x)
-        print(self.y)
+        # print(self.x)
+        # print(self.y)
         self.x += dt * vx
         self.y += dt * vy
-        print(self.x)
-        print(self.y)
+        # print(self.x)
+        # print(self.y)
 
 
 class Pursuer():
@@ -42,6 +48,7 @@ class Pursuer():
         self.size = size
         self.colour = (255, 0, 0)
         self.thickness = 1
+        
 
     ## Helper function to visualize 
     def display(self, screen, scale, w):
@@ -110,6 +117,7 @@ def play_game():
     size = width, height = 600, 600 # display size 500 x 500 px
     screen = pygame.display.set_mode(size)
     scale = width / 6
+    clock = pygame.time.Clock()
     
     # list of initial positions (X = pursuers, Y = evaders)
     # X = # [tuple(float, float), ...]
@@ -126,22 +134,43 @@ def play_game():
         p = Pursuer(x, y)
         P.append(p)
 
-    E = []
-    R = 2.0
-    for ii in range(m):
-        a = (2 * math.pi / m) * ii
-        x = R * np.cos(a)
-        y = R * np.sin(a)
-        e = Evader(x, y)
-        E.append(e)
+    # E = [Evader(scale * 50 + 40, scale * 500 + 400,2,0.2)]
+    E = [Evader(500,100,2,0.05),Evader(200,200,5,0.05),Evader(300,300,9,0.05),Evader(400,400,10,0.05)]
+
+    # p1 = Evader(200,100,angle)
+    # p2 = Evader(100,200,angle)
+    # p3 = Evader(800,100,angle)
+    # x = [p1,p2,p3]
+
+    
+
+    # R = 2.0
+    # for ii in range(m):
+    #     a = (2 * math.pi / m) * ii
+    #     # x = R * np.cos(a)
+    #     # y = R * np.sin(a)
+    #     x = int(np.cos(a) * 100) + 100
+    #     y = int(np.sin(a) * 100) + 100
+    #     e = Evader(x, y)
+    #     E.append(e)
+
 
     dt = 0.01
+  
     
     is_game_over = False
     
     t0 = 0.0
     t = t0
+
+    j = 0
     while not is_game_over:
+
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                exit()
+
         # Assign pursuer-evader pairs
         # Output: 
         # A = [(int: P, int: E), ...]
@@ -173,29 +202,43 @@ def play_game():
             Ui[p][0] = - K * (1 / beta ** 2) * 2 * (px - ex)
             Ui[p][1] = - K * (1 / beta ** 2) * 2 * (py - ey)
         '''
+
         # Integrate dynamics
-        for p_ind, e_ind in A:
-            e = E[e_ind]
-            vx, vy = P[p_ind].vel(e.x, e.y, t, t0)
-            P[p_ind].move(vx, vy, dt)
+        # for p_ind, e_ind in A:
+        #     e = E[e_ind]
+        #     vx, vy = P[p_ind].vel(e.x, e.y, t, t0)
+        #     P[p_ind].move(vx, vy, dt)
         
-        print(E[0].x)
+        # print(E[0].x)
 
-        for ii in range(m):
+        screen.fill((255, 255, 255))
+
+        for ii in range(len(E)):
+            pygame.draw.circle(screen, E[ii].colour,(E[ii].x,E[ii].y), E[ii].size, E[ii].thickness)
             vx, vy = E[ii].vel()
-            E[ii].move(vx, vy, dt)
+            E[ii].x = E[ii].m()[0]
+            E[ii].y = E[ii].m()[1]
+            E[ii].angle += E[ii].speed
+           
 
-        print(E[0].x)
+        # print(E[0].x)
 
         # Visualize
-        [p.display(screen, scale, width) for p in P]
-        [e.display(screen, scale, width) for e in E]
-        pygame.display.flip()
-        
+        # [p.display(screen, scale, width) for p in P]
+        # [e.display(screen, scale, width) for e in E]
+
+        # screen.fill((255, 255, 255))
+
+        clock.tick(30)
+
+        pygame.display.update()
+      
         # Current time
         t = t + dt
 
-        wait = input("Press Enter to continue...")
+        # wait = input("Press Enter to continue...")
+
+    pygame.quit()
         
         
     
