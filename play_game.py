@@ -3,42 +3,38 @@ import math
 # import assign_pairs
 import random
 import pygame
+import time
+
+# global variables
+n = 7 # number of pursuers (0 to n-1)
+m = 7 # number of evaders (0 to m-1)
+
 
 class Evader():
-    def __init__(self, x, y,angle,speed,size=100):
+    def __init__(self, x, y, id, size=10):
         self.x = x
         self.y = y
         self.size = size # px
         self.colour = (0, 0, 255)
         self.thickness = 1 # px
-        self.speed = speed
-        self.angle = angle
-
-
-    def m(self):
-        x = int(np.cos(self.angle) * 100) + 300
-        y = int(np.sin(self.angle) * 100) + 300
-        return x,y
+        self.speed = 2
+        self.ID = id
 
     ## Helper function to visualize 
     def display(self, screen, scale, w):
-        pygame.draw.circle(screen, self.colour, (int(scale * self.x + w), int(-scale * self.y + w)), self.size, self.thickness)
+        pygame.draw.circle(screen, self.colour, (int(scale * self.x + w / 2), int(-scale * self.y + w / 2)), self.size, self.thickness)
 
     ## Compute velocity (circular motion)
     def vel(self):
-        a = np.arctan2(self.x, self.y)
-        vx = self.speed * np.cos(a)
-        vy = self.speed * np.sin(a)
+        a = np.arctan2(self.y, self.x)
+        vx = -self.speed * np.sin(a)
+        vy = self.speed * np.cos(a)
         return vx, vy
 
     ## Evader movement defined by kinematic model
     def move(self, vx, vy, dt):
-        # print(self.x)
-        # print(self.y)
         self.x += dt * vx
         self.y += dt * vy
-        # print(self.x)
-        # print(self.y)
 
 
 class Pursuer():
@@ -48,7 +44,12 @@ class Pursuer():
         self.size = size
         self.colour = (255, 0, 0)
         self.thickness = 1
-        
+        self.capturing_radius = 10
+        self.coordination_radius = 10
+        self.I_a = list(range(m))
+        self.I_t = []
+        self.C_i = []
+        self.neighbours_list = []
 
     ## Helper function to visualize 
     def display(self, screen, scale, w):
@@ -56,9 +57,9 @@ class Pursuer():
 
     ## Compute velocity (using strategy, position (ex, ey) of assigned evader)
     def vel(self, ex, ey, t, t0):
-        a = 1.0 # have to tune these (see Thm 1, Zavlanos and Pappas 2007)
-        R = 1.0
-        K = 1.0
+        a = 0.25 # have to tune these (see Thm 1, Zavlanos and Pappas 2007)
+        R = 4.0
+        K = 2.0
         gamma = math.sqrt((self.x - ex) ** 2 + (self.y - ey) ** 2)
         r = R * math.exp(-a * (t - t0))
         beta = r ** 2 - gamma ** 2
@@ -70,46 +71,93 @@ class Pursuer():
     def move(self, vx, vy, dt):
         self.x += dt * vx
         self.y += dt * vy
-
-'''
-# Helper functions
-def is_neighbor(x_i, x_j) # for pursuer-pursuer
-
-def is_within_reach(x_i, y_k) # for pursuer-evader
-
-def tb(list(int)) #input: list of pursuers up for tie break
-    # pick one of the pursuers randomly
-'''
-
-'''
-def evader_velocities(m):
-    ## Defined an arbitrary height and width used to define the size of the 
-    ##  display screen later on 
-
-    #width, height = 570,570
-    evaders_list = []
-    velocities = [None for i in range(m)]
-
-    ## Loop assigns random eveder dynamics for starting positions and speed.
-    for n in range(m):
-        size = 10  
-        x_vel = random.randint(size, width-size)
-        y_vel = random.randint(size, height-size)
-        evader = Evader(x_vel, y_vel, size)
-        evader.speed = random.random()
-        evader.angle = random.uniform(0, math.pi*2)
-        evaders_list.append(evader)
-
-    for i in range (len(evaders_list)):
-        velocities[i] = (evaders_list[i].x,evaders_list[i].y)
-    return velocities
-'''
         
+    # check if the pursuer can capture assigned evader
+    def is_within_reach(self, ex, ey): 
+        # tune the parameter r 
+        return (self.x - ex)**2 + (self.y - ey)**2 <= self.capturing_radius^2 #*exp(-a*(t-t0)))^2
+
+    # Neighbours to achieve local coordination among the pursuers
+    def is_neighbor(self, px, py):
+        return (self.x - px)**2 + (self.y - py)**2 <= self.coordination_radius #*exp(-a*(t-t0)))^2
+
+    def is_assigned(self):
+        return len(self.I_a) == 1
+
+    def evader_assigned(self):
+        return self.I_a
+
+    def neighbours(self, list_of_pursuers):
+        self.neighbours_list = []
+        for pi in list_of_pursuers:
+            if self.is_neighbor(pi.x,pi.y):
+                self.neighbours_list.append(pi)
+        return self.neighbours_list
+
+
+#This is to generate some velocity field
+def vel_form(centers, dim, list_):
+    u, v = np.zeros((dim, dim)), np.zeros((dim, dim))
+    x, y = np.meshgrid(np.linspace(0,dim,dim+1),np.linspace(0,dim,dim+1))
+    for i in range(len(centers)):
+        c1, c2 = centers[i]
+        cen = (7, 7)
+        u1 = -(x-c1)/((x-c1)**2 + (y-c2)**2)**(32/4)
+        u1[c2, c1] = 0
+        v1 = -(y-c2)/((x-c1)**2 + (y-c2)**2)**(32/4)
+        v1[c2, c1] = 0
+        u, v = u + list_[i]*u1[1:, 1:].copy(), v + list_[i]*v1[1:, 1:].copy()
+    return u, v
+    
+def min_dist(evader, list_of_pursuers): 
+    min_dist = 100000
+    s_i = list_of_pursuers[0]
+    for pursuer in list_of_pursuers:
+        dist = (pursuer.x - evader.x)**2 + (pursuer.y- evader.y)**2
+        if (dist < min_dist):
+            min_dist = dist
+            s_i = pursuer
+    return s_i
+
+def task_assignment(P,E):
+
+    e2a = [] # evaders that satisfy assumption 2a
+    p2a = []
+    for p_ind in range(n):
+        for e_ind in range(m):
+            if (P[p_ind].is_within_reach(E[e_ind].x, E[e_ind].y)) & (len(P[p_ind].I_a) > 1) & (E[e_ind].ID in P[p_ind].I_a):
+                e2a.append(E[e_ind])
+                
+        if (len(e2a) >= 1):
+            # select an evader from all evaders that satisfy assumption 2a, this also incorporates tie breaking 
+            random_index = random.randint(0,len(e2a)-1)
+            selected_evader = e2a[random_index]
+            
+            # identify candidate purusers 
+            for p_ind in range(n):
+                if (P[p_ind].is_within_reach(selected_evader.x, selected_evader.y)) & (len(P[p_ind].I_a) > 1) & (selected_evader.ID in P[p_ind].I_a):
+                    p2a.append(P[p_ind])
+
+            # select the closest pursuer 
+            selected_pursuer = min_dist(selected_evader, p2a)
+
+            #if selected evader is avaialble, update Ia and It of all neighboring purusers
+            if selected_evader.ID in selected_pursuer.I_a: 
+                selected_pursuer.I_a = []
+                selected_pursuer.I_a.append(selected_evader.ID)
+                selected_pursuer.I_t.append(selected_evader.ID) 
+                for neighbour in selected_pursuer.neighbours(P):
+                    if len(neighbour.I_a) > 1 :
+                        neighbour.I_a.remove(selected_evader.ID)
+                    if selected_evader.ID not in neighbour.I_t:
+                        neighbour.I_t.append(selected_evader.ID) 
+
+            e2a = []
+            p2a = []
+
 
 def play_game():
     print("Playing...")
-    n = 4 # number of pursuers (0 to n-1)
-    m = 4 # number of evaders (0 to m-1)
 
     # Set up display
     # https://www.pygame.org/docs/tut/PygameIntro.html
@@ -119,6 +167,9 @@ def play_game():
     scale = width / 6
     clock = pygame.time.Clock()
     
+    # Wait 3 seconds (for screen recording)
+    time.sleep(3)
+
     # list of initial positions (X = pursuers, Y = evaders)
     # X = # [tuple(float, float), ...]
     # Y = # [tuple(float, float), ...]
@@ -134,33 +185,23 @@ def play_game():
         p = Pursuer(x, y)
         P.append(p)
 
-    # E = [Evader(scale * 50 + 40, scale * 500 + 400,2,0.2)]
-    ## Argument 
-    ## x,y, angle, speed. 
-
-    E = [Evader(500,100,2,0.05),Evader(200,200,5,0.05),Evader(300,300,9,0.05),Evader(400,400,10,0.05)]
-    
-    # R = 2.0
-    # for ii in range(m):
-    #     a = (2 * math.pi / m) * ii
-    #     # x = R * np.cos(a)
-    #     # y = R * np.sin(a)
-    #     x = int(np.cos(a) * 100) + 100
-    #     y = int(np.sin(a) * 100) + 100
-    #     e = Evader(x, y)
-    #     E.append(e)
-
+    E = []
+    R = 2.0
+    for ii in range(m):
+        a = (2 * math.pi / m) * ii
+        x = R * np.cos(a)
+        y = R * np.sin(a)
+        e = Evader(x, y, ii)
+        E.append(e)
 
     dt = 0.01
-  
     
     is_game_over = False
     
     t0 = 0.0
     t = t0
-
-    j = 0
     while not is_game_over:
+
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 pygame.quit()
@@ -173,68 +214,63 @@ def play_game():
         # Ex:
         # I[0][0]: pursuer 0's I^a list
         # I[4][1]: pursuer 4's I^t list 
-        A = [(0,0), (1,1), (2,2), (3,3)] # hard-coded assignments for now
+        #A = [(0,0), (1,1), (2,2), (3,3)] # hard-coded assignments for now
 
-        # Control inputs u are computed
-        # Ui = [tuple(float, float)] # 2D control inputs for pursuers
-        # Uk = [tuple(float, float)] # 2D control inputs for evaders
-
-        '''
-        E = evader_velocities(m)
-
-        Ui = [(0,0) for pi in range(n)]
-        a = 1.0 # have to tune these (see Thm 1, Zavlanos and Pappas 2007)
-        R = 1.0
-        K = 1.0
-        for (p,e) in A:
-            px = X[p][0]
-            py = X[p][1]
-            ex = Y[e][0]
-            ey = Y[e][1]
-            gamma = math.sqrt((px - ex) ** 2 + (py - ey) ** 2)
-            r = R * math.exp(-a * (t - t0))
-            beta = r ** 2 - gamma ** 2
-            Ui[p][0] = - K * (1 / beta ** 2) * 2 * (px - ex)
-            Ui[p][1] = - K * (1 / beta ** 2) * 2 * (py - ey)
-        '''
+        task_assignment(P,E)
+        A = []
+        for p_ind in range(n):
+            if len(P[p_ind].I_a) == 1:
+                A.append((p_ind, P[p_ind].I_a[0]))
+        ii =  1
+        for pursuer in P:
+            print("Pursuer ", ii ," location: ", pursuer.x, pursuer.y, "Pursuer Assignment",pursuer.I_a, pursuer.I_t )
+            ii = ii + 1
+        ii =  1
+        for evader in E:
+            print("Evader ", ii ," location: ", evader.x, evader.y, "Pursuer Assignment",evader.ID)
+            ii = ii + 1
 
         # Integrate dynamics
         for p_ind, e_ind in A:
             e = E[e_ind]
             vx, vy = P[p_ind].vel(e.x, e.y, t, t0)
             P[p_ind].move(vx, vy, dt)
-        
-        # print(E[0].x)
 
-        screen.fill((255, 255, 255))
-
-        for ii in range(len(E)):
-            # E[ii].display(screen,scale,width)
-            pygame.draw.circle(screen, E[ii].colour,(E[ii].x,E[ii].y), E[ii].size, E[ii].thickness)
+        for ii in range(m):
             vx, vy = E[ii].vel()
-            E[ii].x = E[ii].m()[0]
-            E[ii].y = E[ii].m()[1]
-            E[ii].angle += E[ii].speed
-           
+            E[ii].move(vx, vy, dt)
 
-        # print(E[0].x)
+        
 
         # Visualize
-        # [p.display(screen, scale, width) for p in P]
-        # [e.display(screen, scale, width) for e in E]
-
-        # screen.fill((255, 255, 255))
-
+        screen.fill((255,255,255))
+        [p.display(screen, scale, width) for p in P]
+        [e.display(screen, scale, width) for e in E]
         clock.tick(30)
-
         pygame.display.update()
-      
+
+        stack = []
+        if len(A) == n:
+             for i in A:
+                if (True == P[i[1]].is_within_reach(E[i[1]].x,E[i[1]].y)):
+                    stack.append(True)
+                else:
+                    stack.append(False)
+                    
+        if len(stack) == n:
+            print(set(stack))
+            if (len(set(stack)) == 1):
+                for item in set(stack):
+                    if item == False:
+                        is_game_over = True
+                
+
+
+        
+        
         # Current time
         t = t + dt
 
-        # wait = input("Press Enter to continue...")
-
-    pygame.quit()
         
         
     
