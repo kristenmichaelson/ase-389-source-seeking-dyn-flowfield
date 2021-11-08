@@ -18,6 +18,8 @@ class Evader():
         self.speed = 0.25
         self.ID = id
         # self.angle = 0
+        self.speed = 2
+        self.ID = id
 
     ## Helper function to visualize 
     def display(self, screen, scale, w):
@@ -75,6 +77,7 @@ class Pursuer():
         self.x += dt * vx
         self.y += dt * vy
     
+
     # check if the pursuer can capture assigned evader
     def is_within_reach(self, ex, ey): 
         # tune the parameter r 
@@ -99,6 +102,7 @@ class Pursuer():
 
 
 
+        
 #This is to generate some velocity field
 def vel_form(centers, dim, list_):
     u, v = np.zeros((dim, dim)), np.zeros((dim, dim))
@@ -113,6 +117,7 @@ def vel_form(centers, dim, list_):
         u, v = u + list_[i]*u1[1:, 1:].copy(), v + list_[i]*v1[1:, 1:].copy()
     return u, v
     
+
 def min_dist(evader, list_of_pursuers): 
     min_dist = 100000
     s_i = list_of_pursuers[0]
@@ -213,6 +218,16 @@ def play_game():
         # Control inputs u are computed
         # Ui = [tuple(float, float)] # 2D control inputs for pursuers
         # Uk = [tuple(float, float)] # 2D control inputs for evaders
+        tast_assignment(P,E)
+        ii =  1
+        for pursuer in P:
+            print("Pursuer ", ii ," location: ", pursuer.x, pursuer.y, "Pursuer Assignment",pursuer.I_a, pursuer.I_t )
+            ii = ii + 1
+        ii =  1
+        for evader in E:
+            print("Evader ", ii ," location: ", evader.x, evader.y, "Pursuer Assignment",evader.ID)
+            ii = ii + 1
+
         tast_assignment(P,E)
         ii =  1
         for pursuer in P:
