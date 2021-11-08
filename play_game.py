@@ -5,7 +5,7 @@ import random
 import pygame
 
 class Evader():
-    def __init__(self, x, y,angle,speed,size=10):
+    def __init__(self, x, y,angle,speed,size=100):
         self.x = x
         self.y = y
         self.size = size # px
@@ -135,15 +135,11 @@ def play_game():
         P.append(p)
 
     # E = [Evader(scale * 50 + 40, scale * 500 + 400,2,0.2)]
+    ## Argument 
+    ## x,y, angle, speed. 
+
     E = [Evader(500,100,2,0.05),Evader(200,200,5,0.05),Evader(300,300,9,0.05),Evader(400,400,10,0.05)]
-
-    # p1 = Evader(200,100,angle)
-    # p2 = Evader(100,200,angle)
-    # p3 = Evader(800,100,angle)
-    # x = [p1,p2,p3]
-
     
-
     # R = 2.0
     # for ii in range(m):
     #     a = (2 * math.pi / m) * ii
@@ -165,7 +161,6 @@ def play_game():
 
     j = 0
     while not is_game_over:
-
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 pygame.quit()
@@ -204,16 +199,17 @@ def play_game():
         '''
 
         # Integrate dynamics
-        # for p_ind, e_ind in A:
-        #     e = E[e_ind]
-        #     vx, vy = P[p_ind].vel(e.x, e.y, t, t0)
-        #     P[p_ind].move(vx, vy, dt)
+        for p_ind, e_ind in A:
+            e = E[e_ind]
+            vx, vy = P[p_ind].vel(e.x, e.y, t, t0)
+            P[p_ind].move(vx, vy, dt)
         
         # print(E[0].x)
 
         screen.fill((255, 255, 255))
 
         for ii in range(len(E)):
+            # E[ii].display(screen,scale,width)
             pygame.draw.circle(screen, E[ii].colour,(E[ii].x,E[ii].y), E[ii].size, E[ii].thickness)
             vx, vy = E[ii].vel()
             E[ii].x = E[ii].m()[0]
