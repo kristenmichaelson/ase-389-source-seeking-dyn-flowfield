@@ -3,6 +3,7 @@ import math
 # import assign_pairs
 import random
 import pygame
+import time
 
 class Evader():
     def __init__(self, x, y, size=10):
@@ -11,28 +12,24 @@ class Evader():
         self.size = size # px
         self.colour = (0, 0, 255)
         self.thickness = 1 # px
-        self.speed = 0.25
+        self.speed = 2
         # self.angle = 0
 
     ## Helper function to visualize 
     def display(self, screen, scale, w):
-        pygame.draw.circle(screen, self.colour, (int(scale * self.x + w), int(-scale * self.y + w)), self.size, self.thickness)
+        pygame.draw.circle(screen, self.colour, (int(scale * self.x + w / 2), int(-scale * self.y + w / 2)), self.size, self.thickness)
 
     ## Compute velocity (circular motion)
     def vel(self):
-        a = np.arctan2(self.x, self.y)
-        vx = self.speed * np.cos(a)
-        vy = self.speed * np.sin(a)
+        a = np.arctan2(self.y, self.x)
+        vx = -self.speed * np.sin(a)
+        vy = self.speed * np.cos(a)
         return vx, vy
 
     ## Evader movement defined by kinematic model
     def move(self, vx, vy, dt):
-        print(self.x)
-        print(self.y)
         self.x += dt * vx
         self.y += dt * vy
-        print(self.x)
-        print(self.y)
 
 
 class Pursuer():
@@ -49,9 +46,9 @@ class Pursuer():
 
     ## Compute velocity (using strategy, position (ex, ey) of assigned evader)
     def vel(self, ex, ey, t, t0):
-        a = 1.0 # have to tune these (see Thm 1, Zavlanos and Pappas 2007)
-        R = 1.0
-        K = 1.0
+        a = 0.25 # have to tune these (see Thm 1, Zavlanos and Pappas 2007)
+        R = 4.0
+        K = 2.0
         gamma = math.sqrt((self.x - ex) ** 2 + (self.y - ey) ** 2)
         r = R * math.exp(-a * (t - t0))
         beta = r ** 2 - gamma ** 2
@@ -63,40 +60,6 @@ class Pursuer():
     def move(self, vx, vy, dt):
         self.x += dt * vx
         self.y += dt * vy
-
-'''
-# Helper functions
-def is_neighbor(x_i, x_j) # for pursuer-pursuer
-
-def is_within_reach(x_i, y_k) # for pursuer-evader
-
-def tb(list(int)) #input: list of pursuers up for tie break
-    # pick one of the pursuers randomly
-'''
-
-'''
-def evader_velocities(m):
-    ## Defined an arbitrary height and width used to define the size of the 
-    ##  display screen later on 
-
-    #width, height = 570,570
-    evaders_list = []
-    velocities = [None for i in range(m)]
-
-    ## Loop assigns random eveder dynamics for starting positions and speed.
-    for n in range(m):
-        size = 10  
-        x_vel = random.randint(size, width-size)
-        y_vel = random.randint(size, height-size)
-        evader = Evader(x_vel, y_vel, size)
-        evader.speed = random.random()
-        evader.angle = random.uniform(0, math.pi*2)
-        evaders_list.append(evader)
-
-    for i in range (len(evaders_list)):
-        velocities[i] = (evaders_list[i].x,evaders_list[i].y)
-    return velocities
-'''
         
 
 def play_game():
@@ -110,7 +73,11 @@ def play_game():
     size = width, height = 600, 600 # display size 500 x 500 px
     screen = pygame.display.set_mode(size)
     scale = width / 6
+    clock = pygame.time.Clock()
     
+    # Wait 3 seconds (for screen recording)
+    time.sleep(3)
+
     # list of initial positions (X = pursuers, Y = evaders)
     # X = # [tuple(float, float), ...]
     # Y = # [tuple(float, float), ...]
@@ -142,6 +109,12 @@ def play_game():
     t0 = 0.0
     t = t0
     while not is_game_over:
+
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                exit()
+
         # Assign pursuer-evader pairs
         # Output: 
         # A = [(int: P, int: E), ...]
@@ -151,51 +124,26 @@ def play_game():
         # I[4][1]: pursuer 4's I^t list 
         A = [(0,0), (1,1), (2,2), (3,3)] # hard-coded assignments for now
 
-        # Control inputs u are computed
-        # Ui = [tuple(float, float)] # 2D control inputs for pursuers
-        # Uk = [tuple(float, float)] # 2D control inputs for evaders
-
-        '''
-        E = evader_velocities(m)
-
-        Ui = [(0,0) for pi in range(n)]
-        a = 1.0 # have to tune these (see Thm 1, Zavlanos and Pappas 2007)
-        R = 1.0
-        K = 1.0
-        for (p,e) in A:
-            px = X[p][0]
-            py = X[p][1]
-            ex = Y[e][0]
-            ey = Y[e][1]
-            gamma = math.sqrt((px - ex) ** 2 + (py - ey) ** 2)
-            r = R * math.exp(-a * (t - t0))
-            beta = r ** 2 - gamma ** 2
-            Ui[p][0] = - K * (1 / beta ** 2) * 2 * (px - ex)
-            Ui[p][1] = - K * (1 / beta ** 2) * 2 * (py - ey)
-        '''
         # Integrate dynamics
         for p_ind, e_ind in A:
             e = E[e_ind]
             vx, vy = P[p_ind].vel(e.x, e.y, t, t0)
             P[p_ind].move(vx, vy, dt)
-        
-        print(E[0].x)
 
         for ii in range(m):
             vx, vy = E[ii].vel()
             E[ii].move(vx, vy, dt)
 
-        print(E[0].x)
-
         # Visualize
+        screen.fill((255,255,255))
         [p.display(screen, scale, width) for p in P]
         [e.display(screen, scale, width) for e in E]
-        pygame.display.flip()
+        clock.tick(30)
+        pygame.display.update()
         
         # Current time
         t = t + dt
 
-        wait = input("Press Enter to continue...")
         
         
     
