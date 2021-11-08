@@ -3,10 +3,12 @@ import math
 # import assign_pairs
 import random
 import pygame
+import time
 
 # global variables
 n = 4 # number of pursuers (0 to n-1)
 m = 4 # number of evaders (0 to m-1)
+
 
 class Evader():
     def __init__(self, x, y, id, size=10):
@@ -15,31 +17,24 @@ class Evader():
         self.size = size # px
         self.colour = (0, 0, 255)
         self.thickness = 1 # px
-        self.speed = 0.25
-        self.ID = id
-        # self.angle = 0
         self.speed = 2
         self.ID = id
 
     ## Helper function to visualize 
     def display(self, screen, scale, w):
-        pygame.draw.circle(screen, self.colour, (int(scale * self.x + w), int(-scale * self.y + w)), self.size, self.thickness)
+        pygame.draw.circle(screen, self.colour, (int(scale * self.x + w / 2), int(-scale * self.y + w / 2)), self.size, self.thickness)
 
     ## Compute velocity (circular motion)
     def vel(self):
-        a = np.arctan2(self.x, self.y)
-        vx = self.speed * np.cos(a)
-        vy = self.speed * np.sin(a)
+        a = np.arctan2(self.y, self.x)
+        vx = -self.speed * np.sin(a)
+        vy = self.speed * np.cos(a)
         return vx, vy
 
     ## Evader movement defined by kinematic model
     def move(self, vx, vy, dt):
-        print(self.x)
-        print(self.y)
         self.x += dt * vx
         self.y += dt * vy
-        print(self.x)
-        print(self.y)
 
 
 class Pursuer():
@@ -62,9 +57,9 @@ class Pursuer():
 
     ## Compute velocity (using strategy, position (ex, ey) of assigned evader)
     def vel(self, ex, ey, t, t0):
-        a = 1.0 # have to tune these (see Thm 1, Zavlanos and Pappas 2007)
-        R = 1.0
-        K = 1.0
+        a = 0.25 # have to tune these (see Thm 1, Zavlanos and Pappas 2007)
+        R = 4.0
+        K = 2.0
         gamma = math.sqrt((self.x - ex) ** 2 + (self.y - ey) ** 2)
         r = R * math.exp(-a * (t - t0))
         beta = r ** 2 - gamma ** 2
@@ -76,8 +71,7 @@ class Pursuer():
     def move(self, vx, vy, dt):
         self.x += dt * vx
         self.y += dt * vy
-    
-
+        
     # check if the pursuer can capture assigned evader
     def is_within_reach(self, ex, ey): 
         # tune the parameter r 
@@ -101,8 +95,6 @@ class Pursuer():
         return self.neighbours_list
 
 
-
-        
 #This is to generate some velocity field
 def vel_form(centers, dim, list_):
     u, v = np.zeros((dim, dim)), np.zeros((dim, dim))
@@ -117,7 +109,6 @@ def vel_form(centers, dim, list_):
         u, v = u + list_[i]*u1[1:, 1:].copy(), v + list_[i]*v1[1:, 1:].copy()
     return u, v
     
-
 def min_dist(evader, list_of_pursuers): 
     min_dist = 100000
     s_i = list_of_pursuers[0]
@@ -128,7 +119,7 @@ def min_dist(evader, list_of_pursuers):
             s_i = pursuer
     return s_i
 
-def tast_assignment(P,E):
+def task_assignment(P,E):
 
     e2a = [] # evaders that satisfy assumption 2a
     p2a = []
@@ -149,6 +140,7 @@ def tast_assignment(P,E):
 
             # select the closest pursuer 
             selected_pursuer = min_dist(selected_evader, p2a)
+
             #if selected evader is avaialble, update Ia and It of all neighbouring purusers
             if selected_evader.ID in selected_pursuer.I_a: 
                 selected_pursuer.I_a = []
@@ -167,17 +159,20 @@ def tast_assignment(P,E):
 def play_game():
     print("Playing...")
 
-
     # Set up display
     # https://www.pygame.org/docs/tut/PygameIntro.html
     pygame.init()
     size = width, height = 600, 600 # display size 500 x 500 px
     screen = pygame.display.set_mode(size)
     scale = width / 6
+    clock = pygame.time.Clock()
     
+    # Wait 3 seconds (for screen recording)
+    time.sleep(3)
+
     # list of initial positions (X = pursuers, Y = evaders)
-    #X = [tuple(float, float), ...]
-    #Y = [tuple(float, float), ...]
+    # X = # [tuple(float, float), ...]
+    # Y = # [tuple(float, float), ...]
 
     # Initialize pursuers, evaders
     # Field is 6m x 6m, centered at the origin
@@ -206,6 +201,12 @@ def play_game():
     t0 = 0.0
     t = t0
     while not is_game_over:
+
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                exit()
+
         # Assign pursuer-evader pairs
         # Output: 
         # A = [(int: P, int: E), ...]
@@ -214,21 +215,12 @@ def play_game():
         # I[0][0]: pursuer 0's I^a list
         # I[4][1]: pursuer 4's I^t list 
         #A = [(0,0), (1,1), (2,2), (3,3)] # hard-coded assignments for now
-        A = [(-1,-1) for i in range(n)]
-        # Control inputs u are computed
-        # Ui = [tuple(float, float)] # 2D control inputs for pursuers
-        # Uk = [tuple(float, float)] # 2D control inputs for evaders
-        tast_assignment(P,E)
-        ii =  1
-        for pursuer in P:
-            print("Pursuer ", ii ," location: ", pursuer.x, pursuer.y, "Pursuer Assignment",pursuer.I_a, pursuer.I_t )
-            ii = ii + 1
-        ii =  1
-        for evader in E:
-            print("Evader ", ii ," location: ", evader.x, evader.y, "Pursuer Assignment",evader.ID)
-            ii = ii + 1
 
-        tast_assignment(P,E)
+        task_assignment(P,E)
+        A = []
+        for p_ind in range(n):
+            if len(P[p_ind].I_a) == 1:
+                A.append((p_ind, P[p_ind].I_a[0]))
         ii =  1
         for pursuer in P:
             print("Pursuer ", ii ," location: ", pursuer.x, pursuer.y, "Pursuer Assignment",pursuer.I_a, pursuer.I_t )
@@ -243,24 +235,21 @@ def play_game():
             e = E[e_ind]
             vx, vy = P[p_ind].vel(e.x, e.y, t, t0)
             P[p_ind].move(vx, vy, dt)
-        
-        print(E[0].x)
 
         for ii in range(m):
             vx, vy = E[ii].vel()
             E[ii].move(vx, vy, dt)
 
-        print(E[0].x)
-
         # Visualize
-        #[p.display(screen, scale, width) for p in P]
-        #[e.display(screen, scale, width) for e in E]
-        #pygame.display.flip()
+        screen.fill((255,255,255))
+        [p.display(screen, scale, width) for p in P]
+        [e.display(screen, scale, width) for e in E]
+        clock.tick(30)
+        pygame.display.update()
         
         # Current time
         t = t + dt
 
-        wait = input("Press Enter to continue...")
         
         
     
