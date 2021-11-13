@@ -2,8 +2,10 @@ import numpy as np
 import math
 # import assign_pairs
 import random
+from numpy.lib.function_base import disp
 import pygame
 import time
+# from multipledispatch import dispatch
 
 # global variables
 n = 7 # number of pursuers (0 to n-1)
@@ -76,6 +78,7 @@ class Pursuer():
     def is_within_reach(self, ex, ey): 
         # tune the parameter r 
         return (self.x - ex)**2 + (self.y - ey)**2 <= self.capturing_radius^2 #*exp(-a*(t-t0)))^2
+    
 
     # Neighbours to achieve local coordination among the pursuers
     def is_neighbor(self, px, py):
@@ -154,6 +157,12 @@ def task_assignment(P,E):
 
             e2a = []
             p2a = []
+
+## capture distance for pursuers and evader.
+def capture_dist (p,e,d):
+     dist = (p.x - e.x)**2 + (p.y- e.y)**2
+     return dist <= d
+     
 
 
 def play_game():
@@ -240,8 +249,6 @@ def play_game():
             vx, vy = E[ii].vel()
             E[ii].move(vx, vy, dt)
 
-        
-
         # Visualize
         screen.fill((255,255,255))
         [p.display(screen, scale, width) for p in P]
@@ -249,20 +256,14 @@ def play_game():
         clock.tick(30)
         pygame.display.update()
 
-        stack = []
+        v= []
         if len(A) == n:
              for i in A:
-                if (True == P[i[1]].is_within_reach(E[i[1]].x,E[i[1]].y)):
-                    stack.append(True)
-                else:
-                    stack.append(False)
-                    
-        if len(stack) == n:
-            print(set(stack))
-            if (len(set(stack)) == 1):
-                for item in set(stack):
-                    if item == False:
-                        is_game_over = True
+                if (True == capture_dist(P[i[0]],E[i[1]],0.01)):
+                      v.append(i[0])
+        if len(v) == n:
+             is_game_over = True
+
                 
 
 
