@@ -5,6 +5,7 @@ import random
 from numpy.lib.function_base import disp
 import pygame
 import time
+from scipy.optimize import linear_sum_assignment
 # from multipledispatch import dispatch
 
 # global variables
@@ -21,10 +22,14 @@ class Evader():
         self.thickness = 1 # px
         self.speed = 2
         self.ID = id
+        self.font = pygame.font.SysFont(None, 15)
+        self.text = self.font.render(str(self.ID), True, (0, 0, 0))
+
 
     ## Helper function to visualize 
     def display(self, screen, scale, w):
         pygame.draw.circle(screen, self.colour, (int(scale * self.x + w / 2), int(-scale * self.y + w / 2)), self.size, self.thickness)
+        screen.blit(self.text, self.text.get_rect(center = (int(scale * self.x + w / 2), int(-scale * self.y + w / 2)) ))
 
     ## Compute velocity (circular motion)
     def vel(self):
@@ -40,7 +45,7 @@ class Evader():
 
 
 class Pursuer():
-    def __init__(self, x, y, size=10):
+    def __init__(self, x, y,id, size=10):
         self.x = x
         self.y = y
         self.size = size
@@ -52,10 +57,17 @@ class Pursuer():
         self.I_t = []
         self.C_i = []
         self.neighbours_list = []
+        self.ID = id
+        self.font = pygame.font.SysFont(None, 15)
+        self.text = self.font.render(str(self.ID), True, (205,51,51))
+
+
 
     ## Helper function to visualize 
     def display(self, screen, scale, w):
         pygame.draw.circle(screen, self.colour, (int(scale * self.x + w / 2), int(-scale * self.y + w / 2)), self.size, self.thickness)
+        screen.blit(self.text, self.text.get_rect(center = (int(scale * self.x + w / 2), int(-scale * self.y + w / 2)) ))
+       
 
     ## Compute velocity (using strategy, position (ex, ey) of assigned evader)
     def vel(self, ex, ey, t, t0):
@@ -162,6 +174,28 @@ def task_assignment(P,E):
 def capture_dist (p,e,d):
      dist = (p.x - e.x)**2 + (p.y- e.y)**2
      return dist <= d
+
+def capture_dist2 (p,e):
+    dist = (p.x - e.x)**2 + (p.y- e.y)**2
+    return dist
+
+
+
+
+
+## helper function to find minimum cost(distance) using the hungarian linear assignment algorithm 
+## Adapted from (Algorithm 2 -Zang )
+## https://arxiv.org/pdf/2103.15660.pdf
+
+def hungarian_lap(P,E):
+    cost_matrix =  np.zeros((n,m))
+    for ii in range(n):
+        for jj in range(m):
+            cost_matrix[ii][jj] = capture_dist2(P[ii],E[jj])
+
+    row_ind, col_ind = linear_sum_assignment(cost_matrix)
+
+    return row_ind,col_ind
      
 
 
@@ -174,6 +208,7 @@ def play_game():
     size = width, height = 600, 600 # display size 500 x 500 px
     screen = pygame.display.set_mode(size)
     scale = width / 6
+    font = pygame.font.SysFont(None, 100)
     clock = pygame.time.Clock()
     
     # Wait 3 seconds (for screen recording)
@@ -191,7 +226,7 @@ def play_game():
     for ii in range(n):
         x = random.random() - 2.0
         y = random.random() - 2.0
-        p = Pursuer(x, y)
+        p = Pursuer(x, y,ii)
         P.append(p)
 
     E = []
@@ -209,6 +244,7 @@ def play_game():
     
     t0 = 0.0
     t = t0
+
     while not is_game_over:
 
         for event in pygame.event.get():
@@ -225,11 +261,24 @@ def play_game():
         # I[4][1]: pursuer 4's I^t list 
         #A = [(0,0), (1,1), (2,2), (3,3)] # hard-coded assignments for now
 
-        task_assignment(P,E)
-        A = []
-        for p_ind in range(n):
-            if len(P[p_ind].I_a) == 1:
-                A.append((p_ind, P[p_ind].I_a[0]))
+
+        # Default Task Assignment approach from Zalvos
+        # task_assignment(P,E)
+        # A = []
+
+        
+        # Uncomment to use a variation of the hungarian assignment method
+
+        p,e = hungarian_lap(P,E)
+        A = list(zip(p,e))
+        
+
+
+
+        # Comment this block if usning hungarian approach
+        # for p_ind in range(n):
+        #     if len(P[p_ind].I_a) == 1:
+        #         A.append((p_ind, P[p_ind].I_a[0]))
         ii =  1
         for pursuer in P:
             print("Pursuer ", ii ," location: ", pursuer.x, pursuer.y, "Pursuer Assignment",pursuer.I_a, pursuer.I_t )
