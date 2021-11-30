@@ -3,6 +3,7 @@ import math
 # import assign_pairs
 import random
 from numpy.lib.function_base import disp
+import matplotlib.pyplot as plt
 import pygame
 import time
 from scipy.optimize import linear_sum_assignment
@@ -131,11 +132,11 @@ def vel_form(centers, dim, list_):
 
 def circular_velocity_field(dim, scale):
     
-    x, y = np.meshgrid(np.linspace(-dim,dim,2*dim),np.linspace(-dim,dim,2*dim))
+    x_field, y_field = np.meshgrid(np.linspace(-dim,dim,2*dim),np.linspace(-dim,dim,2*dim))
 
-    u = -scale*y/np.sqrt(x**2 + y**2)
-    v = scale*x/np.sqrt(x**2 + y**2)
-    return u, v
+    u_field = -scale*y_field/np.sqrt(x_field**2 + y_field**2)
+    v_field = scale*x_field/np.sqrt(x_field**2 + y_field**2)
+    return x_field, y_field, u_field, v_field
 
 def min_dist(evader, list_of_pursuers): 
     min_dist = 100000
@@ -255,7 +256,11 @@ def play_game():
     
     # setting up flow field
     #u, v = vel_form(cen_list, dim, ratio_list)
-    u, v = circular_velocity_field(int(dim/2), 0.012)
+    x_field, y_field, u_field, v_field = circular_velocity_field(int(dim/2), 0.012)
+    # use u and v to update position of purusers and evaders. 
+    plt.quiver(x_field,y_field,u_field,v_field)
+    plt.show()
+    breakpoint()
 
     is_game_over = False
     
@@ -311,6 +316,8 @@ def play_game():
         for ii in range(m):
             vx, vy = E[ii].vel()
             E[ii].move(vx, vy, dt)
+            # something like: E[ii].move(vx + v_field[E[ii].x], vy + u_field[E[ii].y], dt)
+            # check if the dimensions of velocity field is same as dimensions (and range of axis) to the grid for pursuers and evaders that Kristen coded
 
         # Visualize
         screen.fill((255,255,255))
@@ -327,17 +334,9 @@ def play_game():
         if len(v) == n:
              is_game_over = True
 
-                
-
-
-        
-        
         # Current time
         t = t + dt
-
-        
-        
-    
+   
 
 if __name__ == "__main__":
 	play_game()
