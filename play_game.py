@@ -12,6 +12,11 @@ from scipy.optimize import linear_sum_assignment
 n = 7 # number of pursuers (0 to n-1)
 m = 7 # number of evaders (0 to m-1)
 
+#flow field 
+dim = 50
+round_ = 1
+cen_list = [(7 + round_ - 1, 7+ round_ - 1), (42 - round_ + 1, 45 - round_ + 1), (6 + round_ - 1, 45 - round_ + 1)]    
+ratio_list = [0.95/5.0, 0.15/5.0, 1.35/5.0]
 
 class Evader():
     def __init__(self, x, y, id, size=10):
@@ -123,7 +128,15 @@ def vel_form(centers, dim, list_):
         v1[c2, c1] = 0
         u, v = u + list_[i]*u1[1:, 1:].copy(), v + list_[i]*v1[1:, 1:].copy()
     return u, v
+
+def circular_velocity_field(dim, scale):
     
+    x, y = np.meshgrid(np.linspace(-dim,dim,2*dim),np.linspace(-dim,dim,2*dim))
+
+    u = -scale*y/np.sqrt(x**2 + y**2)
+    v = scale*x/np.sqrt(x**2 + y**2)
+    return u, v
+
 def min_dist(evader, list_of_pursuers): 
     min_dist = 100000
     s_i = list_of_pursuers[0]
@@ -240,6 +253,10 @@ def play_game():
 
     dt = 0.01
     
+    # setting up flow field
+    #u, v = vel_form(cen_list, dim, ratio_list)
+    u, v = circular_velocity_field(int(dim/2), 0.012)
+
     is_game_over = False
     
     t0 = 0.0
@@ -272,9 +289,6 @@ def play_game():
         p,e = hungarian_lap(P,E)
         A = list(zip(p,e))
         
-
-
-
         # Comment this block if usning hungarian approach
         # for p_ind in range(n):
         #     if len(P[p_ind].I_a) == 1:
