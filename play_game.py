@@ -14,7 +14,7 @@ n = 7 # number of pursuers (0 to n-1)
 m = 7 # number of evaders (0 to m-1)
 
 #flow field 
-dim = 50
+dim = 6
 round_ = 1
 cen_list = [(7 + round_ - 1, 7+ round_ - 1), (42 - round_ + 1, 45 - round_ + 1), (6 + round_ - 1, 45 - round_ + 1)]    
 ratio_list = [0.95/5.0, 0.15/5.0, 1.35/5.0]
@@ -258,9 +258,9 @@ def play_game():
     #u, v = vel_form(cen_list, dim, ratio_list)
     x_field, y_field, u_field, v_field = circular_velocity_field(int(dim/2), 0.012)
     # use u and v to update position of purusers and evaders. 
-    plt.quiver(x_field,y_field,u_field,v_field)
-    plt.show()
-    breakpoint()
+    #plt.quiver(x_field,y_field,u_field,v_field)
+    #plt.show()
+    #breakpoint()
 
     is_game_over = False
     
@@ -285,19 +285,19 @@ def play_game():
 
 
         # Default Task Assignment approach from Zalvos
-        # task_assignment(P,E)
-        # A = []
+        task_assignment(P,E)
+        A = []
 
         
         # Uncomment to use a variation of the hungarian assignment method
 
-        p,e = hungarian_lap(P,E)
-        A = list(zip(p,e))
+        #p,e = hungarian_lap(P,E)
+        #A = list(zip(p,e))
         
         # Comment this block if usning hungarian approach
-        # for p_ind in range(n):
-        #     if len(P[p_ind].I_a) == 1:
-        #         A.append((p_ind, P[p_ind].I_a[0]))
+        for p_ind in range(n):
+            if len(P[p_ind].I_a) == 1:
+                A.append((p_ind, P[p_ind].I_a[0]))
         ii =  1
         for pursuer in P:
             print("Pursuer ", ii ," location: ", pursuer.x, pursuer.y, "Pursuer Assignment",pursuer.I_a, pursuer.I_t )
@@ -316,6 +316,8 @@ def play_game():
         for ii in range(m):
             vx, vy = E[ii].vel()
             E[ii].move(vx, vy, dt)
+            #breakpoint()
+            E[ii].move(v_field[int(E[ii].x + dim/2), int(E[ii].y + dim/2)], u_field[int(E[ii].x + dim/2), int(E[ii].y + dim/2)], dt)
             # something like: E[ii].move(vx + v_field[E[ii].x], vy + u_field[E[ii].y], dt)
             # check if the dimensions of velocity field is same as dimensions (and range of axis) to the grid for pursuers and evaders that Kristen coded
 
