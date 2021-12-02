@@ -60,6 +60,8 @@ class Pursuer():
         self.ID = id
         self.font = pygame.font.SysFont(None, 15)
         self.text = self.font.render(str(self.ID), True, (205,51,51))
+        self.vx = 0
+        self.vy = 0
 
 
 
@@ -92,7 +94,8 @@ class Pursuer():
         return (self.x - ex)**2 + (self.y - ey)**2 <= self.capturing_radius^2 #*exp(-a*(t-t0)))^2
     
 
-    # Neighbours to achieve local coordination among the pursuers
+    # Neighbors to achieve local coordination among the pursuers
+
     def is_neighbor(self, px, py):
         return (self.x - px)**2 + (self.y - py)**2 <= self.coordination_radius #*exp(-a*(t-t0)))^2
 
@@ -196,7 +199,27 @@ def hungarian_lap(P,E):
     row_ind, col_ind = linear_sum_assignment(cost_matrix)
 
     return row_ind,col_ind
-     
+
+
+
+### Helper to find reachability set 
+
+def time_to_capture(p,e):
+    ## Assumed they moved in same direction/ flow field direction
+    dist = capture_dist2(p,e)
+    mag_velocity_purser = math.sqrt ((p.vx)**2 + (p.vy)**2)
+    vel_ev = e.vel()
+    mag_velocity_evader = math.sqrt((vel_ev[0])**2 + (vel_ev[0])**2)
+    time = dist/ abs(mag_velocity_evader - mag_velocity_purser)
+
+    return time
+
+def time_reachability(P,E):
+    time_matrix =  np.zeros((n,m))
+    for ii in range(n):
+        for jj in range(m):
+            time_matrix[ii][jj] = time_to_capture(P[ii],E[jj])
+    return time_matrix
 
 
 def play_game():
@@ -274,24 +297,32 @@ def play_game():
         
 
 
+        # time matrix 
+        # print("Time reachability matrix" , time_reachability(P,E))
+
+
+
 
         # Comment this block if usning hungarian approach
         # for p_ind in range(n):
         #     if len(P[p_ind].I_a) == 1:
         #         A.append((p_ind, P[p_ind].I_a[0]))
+
         ii =  1
         for pursuer in P:
-            print("Pursuer ", ii ," location: ", pursuer.x, pursuer.y, "Pursuer Assignment",pursuer.I_a, pursuer.I_t )
+            # print("Pursuer ", ii ," location: ", pursuer.x, pursuer.y, "Pursuer Assignment",pursuer.I_a, pursuer.I_t )
             ii = ii + 1
         ii =  1
         for evader in E:
-            print("Evader ", ii ," location: ", evader.x, evader.y, "Pursuer Assignment",evader.ID)
+            # print("Evader ", ii ," location: ", evader.x, evader.y, "Pursuer Assignment",evader.ID)
             ii = ii + 1
 
         # Integrate dynamics
         for p_ind, e_ind in A:
             e = E[e_ind]
             vx, vy = P[p_ind].vel(e.x, e.y, t, t0)
+            P[p_ind].vx = vx
+            P[p_ind].vy = vy
             P[p_ind].move(vx, vy, dt)
 
         for ii in range(m):
