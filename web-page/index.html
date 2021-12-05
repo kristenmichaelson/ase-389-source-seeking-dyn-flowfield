@@ -10,6 +10,12 @@
         <link rel="icon" type="image/x-icon" href="assets/favicon.ico" />
         <!-- Core theme CSS (includes Bootstrap)-->
         <link href="css/styles.css" rel="stylesheet" />
+
+        <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+        <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+
+        <script type="text/javascript" src="https://www.maths.nottingham.ac.uk/plp/pmadw/LaTeXMathML.js"> </script>
+
     </head>
     <body>
         <!-- Responsive navbar-->
@@ -38,7 +44,71 @@
                    the problem of discrete assignment of mobile robots to sources as well as the continuous controls strategies for capturing 
                    individual sources of external dynamic flow-field. </p>
 
-             <!-- <h4>Technical Approach</h4>  -->
+            <h4> Abstract</h4>  
+                <p>Source-seeking, sometimes referred as extremum-seeking, involves locating and tracking one or multiple spots, associated with the maximum or minimum value of interest, in a possibly dynamical environment. 
+                    It has been applied in surveillance, environment monitoring, disaster response etc. 
+                    For example, consider the scenario where a contamination is introduced in a water body or air through submarines or air-borne drones respectively. 
+                    Localizing and tracking all sources of contamination as soon as possible can play a crucial role in disseminating early warning as well as in coming up with localized corrective strategies. 
+                    In this paper, we are assuming that the external flow-field is dynamically changing. Under such circumstances, the mobile robots need to collaboratively assign tasks to each other and localize all the moving sources.  
+
+                    We formulate the problem of dynamical source seeking as a multiple pursuer multiple evader (MPME) game where identical pursuers represent mobile robots and evaders represent the sources moving passively in a dynamical flow field $\bold{V_f}(z,t)$. 
+                    For this work, we assume all the pursuers know positions of evaders. We further assume that pursuers can talk only to their neighbors. 
+                    We also assume all players know the external dynamic flow field. The kinodynamic constraints of pursuer \textit{i} denoted by $x_i(t)$ are given as:
+
+
+                 
+                \begin{figure}
+                    \centering
+                    \includegraphics[width=0.4\textwidth]{/assets/MMAS Figure.png}
+                    \caption{Time evolution of the game}
+                    \label{fig:MMAS Figure}
+                \end{figure}
+
+
+                \begin{equation}
+                    \dot{x}_i = u_i(t) + \bold{V_f}(z,t)
+                    \label{eq:1}
+                \end{equation}
+
+            where $u_i(t)$ is the control vector. We say that pursuer \textit{i} can capture evader \textit{k}, denoted by $y_k(t)$ when 
+
+            \begin{equation}
+                x_i(t) \in \beta_r(y_k(t)) = {||x-y_k(t)||_2 < r}
+                \label{eq:2}
+            \end{equation}
+
+where $\beta_r(y_k(t))$ is open ball of radius r centered at evader \textit{k}. Then our problem formulates to as follows:
+
+Given \textit{n} identical pursuers and evaders and no prior assignment information, derive distributed control laws for every pursuer 
+\textit{i} such that for any initial configuration $x_i(t_0)$, there exists a $T>0$ such that $x_i(t) \in \beta_r(y_k(t))$ for all time $t>t_0+T$, all pursuers \textit{i} and evaders \textit{k}.
+
+</p>
+
+<h4>Specific Aim</h4> 
+
+     <p>   We first aim to replicate the results presented in \cite{b4}, \textit{Distributed Hybrid Control for Multiple-Pursuer Multiple-Evader Games}. We will begin with equal numbers of pursuers and evaders (although \cite{b4} also extends to a formulation with more evaders than pursuers). In this work, both the pursuers' and evaders' dynamics are simple motion. The pursuers' control inputs $u_i$ are velocity vectors. The evaders do not strategize; instead, they follow pre-defined trajectories. Fig.\ref{fig:MMAS Figure} shows the time-evolution of a game with 7 players. 
+
+        The pursuers start off gathered in one area. Meanwhile, the evaders begin to move in a circle. Eventually, the pursuers capture all the evaders.
+
+        At every time step, each pursuer $x_i$ ``claims" the evader $y_k$ closest to it. Define $\gamma(x_i, y_k) = ||x_i - y_k||_2$ and $r(t) = Re^{-a(t - t_0)}$. The pursuer plans a trajectory based on the following strategy
+        \begin{equation}
+            \dot{x}_i = u_{R,a}(x_i, y_k, t) := -K\nabla\varphi_{R,a}(x_i, y_k, t)
+            \label{eq:3}
+        \end{equation}
+        where $\varphi_{R,a}(x_i, y_k, t)$ is a potential function defined as $\varphi_{R,a}(x_i, y_k, t) = \frac{1}{r^2(t) - \gamma^2(x_i, y_k)}$. 
+
+        We aim to replicate their online task assignment policy; making sure all evaders are pursued. Next, we aim to extend \cite{b4} to a game scenario in a dynamic flow field. The flow field will be known to the pursuers, and a new mapping from states to strategies (eq. \ref{eq:3}) will be developed based on this new information structure. Fig. \ref{fig:MMAS Figure} was adapted from \cite{b4} to demonstrate how this might look. 
+
+        Additional possible extensions include:
+        \begin{enumerate}
+            \item Pursuers must estimate the flow field.
+            \item Pursuers must estimation positions of evaders at each time steps.
+            \item Smarter evaders with knowledge of pursuers strategies maximizing their cost and making capture difficult for the pursuers.
+        \end{enumerate}
+
+    </p>
+
+<h4>Technical Approach</h4> 
              
              
 

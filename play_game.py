@@ -3,6 +3,7 @@ import math
 # import assign_pairs
 import random
 from numpy.lib.function_base import disp
+import matplotlib.pyplot as plt
 import pygame
 import time
 from scipy.optimize import linear_sum_assignment
@@ -12,6 +13,11 @@ from scipy.optimize import linear_sum_assignment
 n = 7 # number of pursuers (0 to n-1)
 m = 7 # number of evaders (0 to m-1)
 
+#flow field 
+dim = 6
+round_ = 1
+cen_list = [(7 + round_ - 1, 7+ round_ - 1), (42 - round_ + 1, 45 - round_ + 1), (6 + round_ - 1, 45 - round_ + 1)]    
+ratio_list = [0.95/5.0, 0.15/5.0, 1.35/5.0]
 
 class Evader():
     def __init__(self, x, y, id, size=10):
@@ -60,6 +66,9 @@ class Pursuer():
         self.ID = id
         self.font = pygame.font.SysFont(None, 15)
         self.text = self.font.render(str(self.ID), True, (205,51,51))
+        self.vx = 0
+        self.vy = 0
+
 
 
 
@@ -123,7 +132,15 @@ def vel_form(centers, dim, list_):
         v1[c2, c1] = 0
         u, v = u + list_[i]*u1[1:, 1:].copy(), v + list_[i]*v1[1:, 1:].copy()
     return u, v
+
+def circular_velocity_field(dim, scale):
     
+    x_field, y_field = np.meshgrid(np.linspace(-dim,dim,2*dim),np.linspace(-dim,dim,2*dim))
+
+    u_field = -scale*y_field/np.sqrt(x_field**2 + y_field**2)
+    v_field = scale*x_field/np.sqrt(x_field**2 + y_field**2)
+    return x_field, y_field, u_field, v_field
+
 def min_dist(evader, list_of_pursuers): 
     min_dist = 100000
     s_i = list_of_pursuers[0]
@@ -198,6 +215,54 @@ def hungarian_lap(P,E):
     return row_ind,col_ind
      
 
+## capture distance for pursuers and evader.
+def capture_dist (p,e,d):
+     dist = (p.x - e.x)**2 + (p.y- e.y)**2
+     return dist <= d
+
+def capture_dist2 (p,e):
+    dist = (p.x - e.x)**2 + (p.y- e.y)**2
+    return dist
+
+
+
+
+
+## helper function to find minimum cost(distance) using the hungarian linear assignment algorithm 
+## Adapted from (Algorithm 2 -Zang )
+## https://arxiv.org/pdf/2103.15660.pdf
+
+def hungarian_lap(P,E):
+    cost_matrix =  np.zeros((n,m))
+    for ii in range(n):
+        for jj in range(m):
+            cost_matrix[ii][jj] = capture_dist2(P[ii],E[jj])
+
+    row_ind, col_ind = linear_sum_assignment(cost_matrix)
+
+    return row_ind,col_ind
+
+
+
+### Helper to find reachability set 
+
+def time_to_capture(p,e):
+    ## Assumed they moved in same direction/ flow field direction
+    dist = capture_dist2(p,e)
+    mag_velocity_purser = math.sqrt ((p.vx)**2 + (p.vy)**2)
+    vel_ev = e.vel()
+    mag_velocity_evader = math.sqrt((vel_ev[0])**2 + (vel_ev[0])**2)
+    time = dist/ abs(mag_velocity_evader - mag_velocity_purser)
+
+    return time
+
+def time_reachability(P,E):
+    time_matrix =  np.zeros((n,m))
+    for ii in range(n):
+        for jj in range(m):
+            time_matrix[ii][jj] = time_to_capture(P[ii],E[jj])
+    return time_matrix
+
 
 def play_game():
     print("Playing...")
@@ -240,6 +305,14 @@ def play_game():
 
     dt = 0.01
     
+    # setting up flow field
+    #u, v = vel_form(cen_list, dim, ratio_list)
+    x_field, y_field, u_field, v_field = circular_velocity_field(int(dim/2), 0.012)
+    # use u and v to update position of purusers and evaders. 
+    #plt.quiver(x_field,y_field,u_field,v_field)
+    #plt.show()
+    #breakpoint()
+
     is_game_over = False
     
     t0 = 0.0
@@ -263,22 +336,19 @@ def play_game():
 
 
         # Default Task Assignment approach from Zalvos
-        # task_assignment(P,E)
-        # A = []
+        task_assignment(P,E)
+        A = []
 
         
         # Uncomment to use a variation of the hungarian assignment method
 
-        p,e = hungarian_lap(P,E)
-        A = list(zip(p,e))
+        #p,e = hungarian_lap(P,E)
+        #A = list(zip(p,e))
         
-
-
-
         # Comment this block if usning hungarian approach
-        # for p_ind in range(n):
-        #     if len(P[p_ind].I_a) == 1:
-        #         A.append((p_ind, P[p_ind].I_a[0]))
+        for p_ind in range(n):
+            if len(P[p_ind].I_a) == 1:
+                A.append((p_ind, P[p_ind].I_a[0]))
         ii =  1
         for pursuer in P:
             print("Pursuer ", ii ," location: ", pursuer.x, pursuer.y, "Pursuer Assignment",pursuer.I_a, pursuer.I_t )
@@ -292,11 +362,17 @@ def play_game():
         for p_ind, e_ind in A:
             e = E[e_ind]
             vx, vy = P[p_ind].vel(e.x, e.y, t, t0)
+            P[p_ind].vx = vx
+            P[p_ind].vy = vy
             P[p_ind].move(vx, vy, dt)
 
         for ii in range(m):
             vx, vy = E[ii].vel()
             E[ii].move(vx, vy, dt)
+            #breakpoint()
+            E[ii].move(v_field[int(E[ii].x + dim/2), int(E[ii].y + dim/2)], u_field[int(E[ii].x + dim/2), int(E[ii].y + dim/2)], dt)
+            # something like: E[ii].move(vx + v_field[E[ii].x], vy + u_field[E[ii].y], dt)
+            # check if the dimensions of velocity field is same as dimensions (and range of axis) to the grid for pursuers and evaders that Kristen coded
 
         # Visualize
         screen.fill((255,255,255))
@@ -313,17 +389,9 @@ def play_game():
         if len(v) == n:
              is_game_over = True
 
-                
-
-
-        
-        
         # Current time
         t = t + dt
-
-        
-        
-    
+   
 
 if __name__ == "__main__":
 	play_game()
