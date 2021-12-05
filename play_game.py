@@ -169,9 +169,10 @@ def draw_arrow(A, B, surf, width=2):
 
 
 class VectorField():
-    def __init__(self, function,dim,scale):
+    def __init__(self, function,dim,scale,step):
         self.function = function
         self.dim = dim
+        self.step = step
         self.scale = scale
         self._generate_vectors()
 
@@ -185,7 +186,7 @@ class VectorField():
 
         self.vectors = []
 
-        x_field,y_field = np.meshgrid(np.linspace(-dim,dim,2*dim),np.linspace(-dim,dim,2*dim))
+        x_field,y_field = np.meshgrid(np.linspace(-dim,dim,self.step),np.linspace(-dim,dim,self.step))
 
         u = - self.scale * y_field/np.sqrt(x_field**2 + y_field**2)
         v = self.scale * x_field/np.sqrt(x_field**2 + y_field**2)
@@ -358,7 +359,7 @@ def play_game():
     #x_field, y_field, u_field, v_field = circular_velocity_field(int(dim/2), 0.012)
 
     function = lambda x, y: (-sin(y), x)
-    h = VectorField(function,int(dim/2), 0.012)
+    h = VectorField(function,int(dim/2), 0.012,50)
     # v = h.speed()[0]
 
     # print(v)
