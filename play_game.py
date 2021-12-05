@@ -136,50 +136,77 @@ def vel_form(centers, dim, list_):
 
 
 
+################################################################################
 
-#### Just adding this
-# 
-#
+WIDTH= 600 
+HEIGHT = 600
 
-size = width, height = 600, 600
+x_units, y_units = 8, 8;
+hwidth, hheight = WIDTH / 2, HEIGHT / 2;
+x_scale, y_scale = WIDTH / x_units, HEIGHT / y_units
 
+### Converts to rectangular form
+def from_polar(r, theta):
+    return r * cos(theta), r * sin(theta)
 
-x_units, y_units = 6, 6;
-hwidth, hheight = width / 2, height / 2;
-x_scale, y_scale = width / x_units, height / y_units;
-
-def convert(r, theta):
-    return r * cos(theta), r * sin(theta);
-
-def safe_drange(start, stop, step=1, precision=2):
-    scaler = 10 ** precision;
-    start, stop = start * scaler, stop * scaler;
-    step = step * scaler;
-    
-    for i in range(int(start), int(stop), int(step)):
-        yield i / scaler;
-
+#### Scale the flow field
 def translate_and_scale(x, y):
     return (x * x_scale) + hwidth, hheight - (y * y_scale)
 
-## Draw Arrows
 def draw_arrow(A, B, surf, width=2):
     dy, dx = A[1] - B[1], A[0] - B[0]
     angle = atan2(dy, dx)
+
     color = (0, 0, 0)
-    
-    dist = hypot(dx, dy) / 5; 
-    x1, y1 = convert(dist, angle + (pi / 4))
-    x2, y2 = convert(dist, angle - (pi / 4))
 
-    # print(x1,y1)
-    # print(A,B)
-
+    dist = hypot(dx, dy) / 5
+    ### use to find arrow head angle #######
+    x1, y1 = from_polar(dist, angle + (pi / 4))
+    x2, y2 = from_polar(dist, angle - (pi / 4))
     pygame.draw.line(surf, color, A, B, width)
     pygame.draw.line(surf, color, B, (B[0] + x1, B[1] + y1), width)
     pygame.draw.line(surf, color, B, (B[0] + x2, B[1] + y2), width)
 
 
+class VectorField():
+    def __init__(self, function,dim,scale):
+        self.function = function
+        self.dim = dim
+        self.scale = scale
+        self._generate_vectors()
+
+    def circular_velocity_field(self):
+        x_field, y_field = np.meshgrid(np.linspace(-self.dim,self.dim,2*self.dim),np.linspace(-self.dim,self.dim,2*self.dim))
+        u_field = -self.scale*y_field/np.sqrt(x_field**2 + y_field**2)
+        v_field = self.scale*x_field/np.sqrt(x_field**2 + y_field**2)
+        return x_field, y_field, u_field, v_field
+
+    def _generate_vectors(self):
+
+        self.vectors = []
+
+        x_field,y_field = np.meshgrid(np.linspace(-dim,dim,2*dim),np.linspace(-dim,dim,2*dim))
+
+        u = - self.scale * y_field/np.sqrt(x_field**2 + y_field**2)
+        v = self.scale * x_field/np.sqrt(x_field**2 + y_field**2)
+
+        B = x_field.tolist()
+        C = y_field.tolist()
+
+        H = list(zip(B,C))
+        for i in range(len(H)):
+            for j in range(len(H[i][0])):
+                tup = (H[i][0][j], H[i][1][j])
+                dx, dy = self.function(tup[0], tup[1])
+                self.vectors.append((tup[0], tup[1], tup[0] + dx / 8, tup[1] + dy / 8))
+
+
+    def draw(self, surf):
+        for vector in self.vectors:
+            draw_arrow(translate_and_scale(vector[0], vector[1]), translate_and_scale(vector[2], vector[3]), surf);
+
+
+################################################################################
 
 def circular_velocity_field(dim, scale):
     
@@ -188,52 +215,7 @@ def circular_velocity_field(dim, scale):
     u_field = -scale*y_field/np.sqrt(x_field**2 + y_field**2)
     v_field = scale*x_field/np.sqrt(x_field**2 + y_field**2)
     return x_field, y_field, u_field, v_field
-
-def circular_velocity_field2(dim, scale):
     
-    x_field, y_field = np.meshgrid(np.linspace(-dim,dim,2*dim),np.linspace(-dim,dim,2*dim))
-
-    # print(x_field)
-
-    u_field = -scale*y_field/np.sqrt(x_field**2 + y_field**2)
-    v_field = scale*x_field/np.sqrt(x_field**2 + y_field**2)
-    return x_field, y_field, u_field, v_field
-
-
-class VectorField():
-    
-    def __init__(self,function, dim,scale,vecs_per_unit=2):
-        self.function = function;
-        self.vecs_per_unit = vecs_per_unit;
-        self.step = 1 / self.vecs_per_unit;
-        self._generate_vectors();
-        self.scale = scale;
-        self.dim = dim
-      
-    def _generate_vectors(self):
-        self.vectors = [];
-        for x in safe_drange(-dim,dim, self.step):
-            for y in safe_drange(-dim,dim,self.step):
-                try:
-                    # dx, dy = x,y;
-                    dx, dy = self.function(x, y);
-                    self.vectors.append((x, y, x + dx / 8, y + dy / 8))
-                except ZeroDivisionError:
-                    continue
-        # print(len(self.vectors))
-
-    def draw(self, surf):            
-        for vector in self.vectors:
-            # x = np.asarray(translate_and_scale(vector[0], vector[1]))
-            # y = np.asarray(translate_and_scale(vector[2], vector[3]))
-            draw_arrow(translate_and_scale(vector[0], vector[1]),translate_and_scale(vector[2], vector[3]), surf)
-            # u_field = -self.scale*y/np.sqrt(x**2 + y**2)
-            # v_field = self.scale*x /np.sqrt(x**2 + y**2)
-            # vector()
-
-    
-
-
 
 def min_dist(evader, list_of_pursuers): 
     min_dist = 100000
@@ -376,7 +358,7 @@ def play_game():
     #x_field, y_field, u_field, v_field = circular_velocity_field(int(dim/2), 0.012)
 
     function = lambda x, y: (-sin(y), x)
-    h = VectorField(function,int(dim/2), 0.012, vecs_per_unit=4)
+    h = VectorField(function,int(dim/2), 0.012)
     # v = h.speed()[0]
 
     # print(v)
@@ -425,11 +407,11 @@ def play_game():
                 A.append((p_ind, P[p_ind].I_a[0]))
         ii =  1
         for pursuer in P:
-            print("Pursuer ", ii ," location: ", pursuer.x, pursuer.y, "Pursuer Assignment",pursuer.I_a, pursuer.I_t )
+            # print("Pursuer ", ii ," location: ", pursuer.x, pursuer.y, "Pursuer Assignment",pursuer.I_a, pursuer.I_t )
             ii = ii + 1
         ii =  1
         for evader in E:
-            print("Evader ", ii ," location: ", evader.x, evader.y, "Pursuer Assignment",evader.ID)
+            # print("Evader ", ii ," location: ", evader.x, evader.y, "Pursuer Assignment",evader.ID)
             ii = ii + 1
 
         # Integrate dynamics
@@ -454,8 +436,6 @@ def play_game():
         screen.fill((255,255,255))
 
 
-
-     
 
         h.draw(screen)
 
