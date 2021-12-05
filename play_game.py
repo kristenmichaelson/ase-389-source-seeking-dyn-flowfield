@@ -187,32 +187,6 @@ def task_assignment(P,E):
             e2a = []
             p2a = []
 
-## capture distance for pursuers and evader.
-def capture_dist (p,e,d):
-     dist = (p.x - e.x)**2 + (p.y- e.y)**2
-     return dist <= d
-
-def capture_dist2 (p,e):
-    dist = (p.x - e.x)**2 + (p.y- e.y)**2
-    return dist
-
-
-
-
-
-## helper function to find minimum cost(distance) using the hungarian linear assignment algorithm 
-## Adapted from (Algorithm 2 -Zang )
-## https://arxiv.org/pdf/2103.15660.pdf
-
-def hungarian_lap(P,E):
-    cost_matrix =  np.zeros((n,m))
-    for ii in range(n):
-        for jj in range(m):
-            cost_matrix[ii][jj] = capture_dist2(P[ii],E[jj])
-
-    row_ind, col_ind = linear_sum_assignment(cost_matrix)
-
-    return row_ind,col_ind
      
 
 ## capture distance for pursuers and evader.
@@ -265,23 +239,24 @@ def time_reachability(P,E):
 
 
 def play_game():
+    flowfield_mode = 'ON' # flowfield mode: 'ON' or 'OFF'
+    task_assign_mode = 'HUNGARIAN' # task assignment mode: 'ZAVLANOS' or 'HUNGARIAN' or 'MATRIX'
+    display_game = True
+
     print("Playing...")
 
-    # Set up display
-    # https://www.pygame.org/docs/tut/PygameIntro.html
     pygame.init()
-    size = width, height = 600, 600 # display size 500 x 500 px
-    screen = pygame.display.set_mode(size)
-    scale = width / 6
-    font = pygame.font.SysFont(None, 100)
     clock = pygame.time.Clock()
-    
-    # Wait 3 seconds (for screen recording)
-    time.sleep(3)
 
-    # list of initial positions (X = pursuers, Y = evaders)
-    # X = # [tuple(float, float), ...]
-    # Y = # [tuple(float, float), ...]
+    if display_game:
+        # Set up display
+        # https://www.pygame.org/docs/tut/PygameIntro.html
+        size = width, height = 600, 600 # display size 500 x 500 px
+        screen = pygame.display.set_mode(size)
+        scale = width / 6
+        font = pygame.font.SysFont(None, 100)
+        # Wait 3 seconds (for screen recording)
+        time.sleep(3)
 
     # Initialize pursuers, evaders
     # Field is 6m x 6m, centered at the origin
@@ -307,7 +282,10 @@ def play_game():
     
     # setting up flow field
     #u, v = vel_form(cen_list, dim, ratio_list)
-    x_field, y_field, u_field, v_field = circular_velocity_field(int(dim/2), 0.012)
+    if flowfield_mode == 'ON':
+        x_field, y_field, u_field, v_field = circular_velocity_field(int(dim/2), 2.0)
+    else:
+        x_field, y_field, u_field, v_field = circular_velocity_field(int(dim/2), 0.0)
     # use u and v to update position of purusers and evaders. 
     #plt.quiver(x_field,y_field,u_field,v_field)
     #plt.show()
@@ -326,29 +304,21 @@ def play_game():
                 exit()
 
         # Assign pursuer-evader pairs
-        # Output: 
-        # A = [(int: P, int: E), ...]
-        # I = list of pairs [(I^a(list: int), I^t(list: int)), ...]
-        # Ex:
-        # I[0][0]: pursuer 0's I^a list
-        # I[4][1]: pursuer 4's I^t list 
-        #A = [(0,0), (1,1), (2,2), (3,3)] # hard-coded assignments for now
+        if task_assign_mode == 'ZAVLANOS':
+            task_assignment(P,E)
+            A = []
+            for p_ind in range(n):
+                if len(P[p_ind].I_a) == 1:
+                    A.append((p_ind, P[p_ind].I_a[0]))
+        elif task_assign_mode == 'HUNGARIAN':
+            p,e = hungarian_lap(P,E)
+            A = list(zip(p,e))
+        else:
+            time_matrix = time_reachability(P,E)
+            ###%%%% TODO: MAKE ASSIGNMENTS WITH THIS MATRIX %%%%###
 
-
-        # Default Task Assignment approach from Zalvos
-        task_assignment(P,E)
-        A = []
-
-        
-        # Uncomment to use a variation of the hungarian assignment method
-
-        #p,e = hungarian_lap(P,E)
-        #A = list(zip(p,e))
-        
-        # Comment this block if usning hungarian approach
-        for p_ind in range(n):
-            if len(P[p_ind].I_a) == 1:
-                A.append((p_ind, P[p_ind].I_a[0]))
+        # Check assignments
+        '''
         ii =  1
         for pursuer in P:
             print("Pursuer ", ii ," location: ", pursuer.x, pursuer.y, "Pursuer Assignment",pursuer.I_a, pursuer.I_t )
@@ -357,29 +327,37 @@ def play_game():
         for evader in E:
             print("Evader ", ii ," location: ", evader.x, evader.y, "Pursuer Assignment",evader.ID)
             ii = ii + 1
+        '''
 
         # Integrate dynamics
         for p_ind, e_ind in A:
             e = E[e_ind]
-            vx, vy = P[p_ind].vel(e.x, e.y, t, t0)
+            # Compute optimal velocity using Zavlanos method
+            vx, vy = P[p_ind].vel(e.x, e.y, t, t0) 
+            # Add in flowfield velocities
+            vx += u_field[int(P[ii].x + dim/2), int(P[ii].y + dim/2)] # should this be u_field or v_field?
+            vy += v_field[int(P[ii].x + dim/2), int(P[ii].y + dim/2)]
             P[p_ind].vx = vx
             P[p_ind].vy = vy
             P[p_ind].move(vx, vy, dt)
 
         for ii in range(m):
-            vx, vy = E[ii].vel()
-            E[ii].move(vx, vy, dt)
-            #breakpoint()
-            E[ii].move(v_field[int(E[ii].x + dim/2), int(E[ii].y + dim/2)], u_field[int(E[ii].x + dim/2), int(E[ii].y + dim/2)], dt)
-            # something like: E[ii].move(vx + v_field[E[ii].x], vy + u_field[E[ii].y], dt)
-            # check if the dimensions of velocity field is same as dimensions (and range of axis) to the grid for pursuers and evaders that Kristen coded
+            if flowfield_mode == 'OFF':
+                vx, vy = E[ii].vel() # move along a circle
+                E[ii].move(vx, vy, dt)
+            else:
+                #breakpoint()
+                E[ii].move(v_field[int(E[ii].x + dim/2), int(E[ii].y + dim/2)], u_field[int(E[ii].x + dim/2), int(E[ii].y + dim/2)], dt)
+                # something like: E[ii].move(vx + v_field[E[ii].x], vy + u_field[E[ii].y], dt)
+                # check if the dimensions of velocity field is same as dimensions (and range of axis) to the grid for pursuers and evaders that Kristen coded
 
         # Visualize
-        screen.fill((255,255,255))
-        [p.display(screen, scale, width) for p in P]
-        [e.display(screen, scale, width) for e in E]
-        clock.tick(30)
-        pygame.display.update()
+        if display_game:
+            screen.fill((255,255,255))
+            [p.display(screen, scale, width) for p in P]
+            [e.display(screen, scale, width) for e in E]
+            clock.tick(30)
+            pygame.display.update()
 
         v= []
         if len(A) == n:
@@ -388,6 +366,10 @@ def play_game():
                       v.append(i[0])
         if len(v) == n:
              is_game_over = True
+             print('--- GAME SUMMARY ---')
+             print('Flowfield: ' + flowfield_mode)
+             print('Task assignment: ' + task_assign_mode)
+             print('Time to capture: ' + str(t))
 
         # Current time
         t = t + dt
