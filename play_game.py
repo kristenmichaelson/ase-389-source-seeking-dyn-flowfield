@@ -66,6 +66,9 @@ class Pursuer():
         self.ID = id
         self.font = pygame.font.SysFont(None, 15)
         self.text = self.font.render(str(self.ID), True, (205,51,51))
+        self.vx = 0
+        self.vy = 0
+
 
 
 
@@ -212,6 +215,54 @@ def hungarian_lap(P,E):
     return row_ind,col_ind
      
 
+## capture distance for pursuers and evader.
+def capture_dist (p,e,d):
+     dist = (p.x - e.x)**2 + (p.y- e.y)**2
+     return dist <= d
+
+def capture_dist2 (p,e):
+    dist = (p.x - e.x)**2 + (p.y- e.y)**2
+    return dist
+
+
+
+
+
+## helper function to find minimum cost(distance) using the hungarian linear assignment algorithm 
+## Adapted from (Algorithm 2 -Zang )
+## https://arxiv.org/pdf/2103.15660.pdf
+
+def hungarian_lap(P,E):
+    cost_matrix =  np.zeros((n,m))
+    for ii in range(n):
+        for jj in range(m):
+            cost_matrix[ii][jj] = capture_dist2(P[ii],E[jj])
+
+    row_ind, col_ind = linear_sum_assignment(cost_matrix)
+
+    return row_ind,col_ind
+
+
+
+### Helper to find reachability set 
+
+def time_to_capture(p,e):
+    ## Assumed they moved in same direction/ flow field direction
+    dist = capture_dist2(p,e)
+    mag_velocity_purser = math.sqrt ((p.vx)**2 + (p.vy)**2)
+    vel_ev = e.vel()
+    mag_velocity_evader = math.sqrt((vel_ev[0])**2 + (vel_ev[0])**2)
+    time = dist/ abs(mag_velocity_evader - mag_velocity_purser)
+
+    return time
+
+def time_reachability(P,E):
+    time_matrix =  np.zeros((n,m))
+    for ii in range(n):
+        for jj in range(m):
+            time_matrix[ii][jj] = time_to_capture(P[ii],E[jj])
+    return time_matrix
+
 
 def play_game():
     print("Playing...")
@@ -311,6 +362,8 @@ def play_game():
         for p_ind, e_ind in A:
             e = E[e_ind]
             vx, vy = P[p_ind].vel(e.x, e.y, t, t0)
+            P[p_ind].vx = vx
+            P[p_ind].vy = vy
             P[p_ind].move(vx, vy, dt)
 
         for ii in range(m):
