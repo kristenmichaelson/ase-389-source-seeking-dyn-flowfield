@@ -82,7 +82,7 @@ class Pursuer():
     ## Compute velocity (using strategy, position (ex, ey) of assigned evader)
     def vel(self, ex, ey, t, t0):
         a = 0.25 # have to tune these (see Thm 1, Zavlanos and Pappas 2007)
-        R = 4.0
+        R = 8.0
         K = 2.0
         gamma = math.sqrt((self.x - ex) ** 2 + (self.y - ey) ** 2)
         r = R * math.exp(-a * (t - t0))
@@ -160,10 +160,10 @@ class VectorField():
         # self.scale = scale
         self._generate_vectors()
 
-    def circular_velocity_field(self,scale):
-        x_field, y_field = np.meshgrid(np.linspace(-dim,dim,self.step),np.linspace(-dim,dim,self.step))
-        u_field = -scale*y_field/np.sqrt(x_field**2 + y_field**2)
-        v_field = scale*x_field/np.sqrt(x_field**2 + y_field**2)
+    def circular_velocity_field(self,dim, scale):
+        x_field, y_field = np.meshgrid(np.linspace(-dim,dim,2*dim),np.linspace(-dim,dim,2*dim))
+        u_field = scale*y_field/np.sqrt(x_field**2 + y_field**2)
+        v_field = -scale*x_field/np.sqrt(x_field**2 + y_field**2)
         return x_field, y_field, u_field, v_field
 
     def _generate_vectors(self):
@@ -300,7 +300,7 @@ def time_to_capture(p,e):
     dist = capture_dist2(p,e)
     mag_velocity_purser = math.sqrt ((p.vx)**2 + (p.vy)**2)
     vel_ev = e.vel()
-    mag_velocity_evader = math.sqrt((vel_ev[0])**2 + (vel_ev[0])**2)
+    mag_velocity_evader = math.sqrt((vel_ev[0])**2 + (vel_ev[1])**2)
     time = dist/ abs(mag_velocity_evader - mag_velocity_purser)
 
     return time
@@ -315,7 +315,7 @@ def time_reachability(P,E):
 
 def play_game():
     flowfield_mode = 'ON' # flowfield mode: 'ON' or 'OFF'
-    task_assign_mode = 'HUNGARIAN' # task assignment mode: 'ZAVLANOS' or 'HUNGARIAN' or 'MATRIX'
+    task_assign_mode = 'ZAVLANOS' # task assignment mode: 'ZAVLANOS' or 'HUNGARIAN' or 'MATRIX'
     display_game = True
 
     print("Playing...")
@@ -357,6 +357,7 @@ def play_game():
 
 
     function = lambda x, y: (-sin(y), x)
+    # function = lambda x, y: (-y/np.sqrt(x**2 + y**2), x/np.sqrt(x**2 + y**2) )
     h = VectorField(function,int(dim/2), 0.012,50)
 
 
@@ -366,10 +367,10 @@ def play_game():
     #u, v = vel_form(cen_list, dim, ratio_list)
     if flowfield_mode == 'ON':
         # x_field, y_field, u_field, v_field = circular_velocity_field(int(dim/2), 2.0)
-        x_field, y_field, u_field, v_field = h.circular_velocity_field(0.012)
+        x_field, y_field, u_field, v_field = h.circular_velocity_field(int(dim/2), 2.0)
     else:
         # x_field, y_field, u_field, v_field = circular_velocity_field(int(dim/2), 0.0)
-        x_field, y_field, u_field, v_field = h.circular_velocity_field()
+        x_field, y_field, u_field, v_field = h.circular_velocity_field(int(dim/2), 0.0)
 
     
     # use u and v to update position of purusers and evaders. 
@@ -401,7 +402,8 @@ def play_game():
             A = list(zip(p,e))
         else:
             time_matrix = time_reachability(P,E)
-            ###%%%% TODO: MAKE ASSIGNMENTS WITH THIS MATRIX %%%%###
+            p,e = linear_sum_assignment(time_matrix)
+            A = list(zip(p,e))
 
         # Check assignments
         '''
@@ -421,8 +423,8 @@ def play_game():
             # Compute optimal velocity using Zavlanos method
             vx, vy = P[p_ind].vel(e.x, e.y, t, t0) 
             # Add in flowfield velocities
-            vx += u_field[int(P[ii].x + dim/2), int(P[ii].y + dim/2)] # should this be u_field or v_field?
-            vy += v_field[int(P[ii].x + dim/2), int(P[ii].y + dim/2)]
+            vx += v_field[int(P[ii].x + dim/2), int(P[ii].y + dim/2)] # should this be u_field or v_field?
+            vy += u_field[int(P[ii].x + dim/2), int(P[ii].y + dim/2)]
             P[p_ind].vx = vx
             P[p_ind].vy = vy
             P[p_ind].move(vx, vy, dt)
@@ -440,7 +442,7 @@ def play_game():
         # Visualize
         if display_game:
             screen.fill((255,255,255))
-            h.draw(screen)
+            if flowfield_mode == 'ON': h.draw(screen)
             [p.display(screen, scale, width) for p in P]
             [e.display(screen, scale, width) for e in E]
             clock.tick(30)
@@ -451,7 +453,7 @@ def play_game():
              for i in A:
                 if (True == capture_dist(P[i[0]],E[i[1]],0.01)):
                       v.append(i[0])
-        if len(v) == n:
+        if (len(v) == n) or (t > 15.):
              is_game_over = True
              print('--- GAME SUMMARY ---')
              print('Flowfield: ' + flowfield_mode)
@@ -459,8 +461,9 @@ def play_game():
              print('Time to capture: ' + str(t))
 
         # Current time
-        t = t + dt
+        t += dt
    
 
 if __name__ == "__main__":
-	play_game()
+    for _ in range(10):
+	    play_game()
