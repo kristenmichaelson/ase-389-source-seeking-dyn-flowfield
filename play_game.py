@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 import pygame
 import time
 from scipy.optimize import linear_sum_assignment
+from math import hypot, atan2, sin, cos, pi;
 # from multipledispatch import dispatch
 
 # global variables
@@ -119,6 +120,80 @@ class Pursuer():
         return self.neighbours_list
 
 
+
+
+WIDTH= 600 
+HEIGHT = 600
+
+x_units, y_units = 8, 8;
+hwidth, hheight = WIDTH / 2, HEIGHT / 2;
+x_scale, y_scale = WIDTH / x_units, HEIGHT / y_units
+
+### Converts to rectangular form
+def from_polar(r, theta):
+    return r * cos(theta), r * sin(theta)
+
+#### Scale the flow field
+def translate_and_scale(x, y):
+    return (x * x_scale) + hwidth, hheight - (y * y_scale)
+
+def draw_arrow(A, B, surf, width=2):
+    dy, dx = A[1] - B[1], A[0] - B[0]
+    angle = atan2(dy, dx)
+
+    color = (0, 0, 0)
+
+    dist = hypot(dx, dy) / 5
+    ### use to find arrow head angle #######
+    x1, y1 = from_polar(dist, angle + (pi / 4))
+    x2, y2 = from_polar(dist, angle - (pi / 4))
+    pygame.draw.line(surf, color, A, B, width)
+    pygame.draw.line(surf, color, B, (B[0] + x1, B[1] + y1), width)
+    pygame.draw.line(surf, color, B, (B[0] + x2, B[1] + y2), width)
+
+
+class VectorField():
+    def __init__(self,function,scale,dim,step):
+        self.function = function
+        self.dim = dim
+        self.step = step
+        # self.scale = scale
+        self._generate_vectors()
+
+    def circular_velocity_field(self,scale):
+        x_field, y_field = np.meshgrid(np.linspace(-dim,dim,self.step),np.linspace(-dim,dim,self.step))
+        u_field = -scale*y_field/np.sqrt(x_field**2 + y_field**2)
+        v_field = scale*x_field/np.sqrt(x_field**2 + y_field**2)
+        return x_field, y_field, u_field, v_field
+
+    def _generate_vectors(self):
+
+        self.vectors = []
+
+        x_field,y_field = np.meshgrid(np.linspace(-dim,dim,self.step),np.linspace(-dim,dim,self.step))
+
+        # u = - self.scale * y_field/np.sqrt(x_field**2 + y_field**2)
+        # v = self.scale * x_field/np.sqrt(x_field**2 + y_field**2)
+
+        B = x_field.tolist()
+        C = y_field.tolist()
+
+        H = list(zip(B,C))
+        for i in range(len(H)):
+            for j in range(len(H[i][0])):
+                tup = (H[i][0][j], H[i][1][j])
+                dx, dy = self.function(tup[0], tup[1])
+                self.vectors.append((tup[0], tup[1], tup[0] + dx / 8, tup[1] + dy / 8))
+
+
+    def draw(self, surf):
+        for vector in self.vectors:
+            draw_arrow(translate_and_scale(vector[0], vector[1]), translate_and_scale(vector[2], vector[3]), surf);
+
+
+
+
+
 #This is to generate some velocity field
 def vel_form(centers, dim, list_):
     u, v = np.zeros((dim, dim)), np.zeros((dim, dim))
@@ -173,7 +248,7 @@ def task_assignment(P,E):
             # select the closest pursuer 
             selected_pursuer = min_dist(selected_evader, p2a)
 
-            #if selected evader is avaialble, update Ia and It of all neighboring purusers
+            #if selected evader is available, update Ia and It of all neighboring purusers
             if selected_evader.ID in selected_pursuer.I_a: 
                 selected_pursuer.I_a = []
                 selected_pursuer.I_a.append(selected_evader.ID)
@@ -279,13 +354,24 @@ def play_game():
         E.append(e)
 
     dt = 0.01
+
+
+    function = lambda x, y: (-sin(y), x)
+    h = VectorField(function,int(dim/2), 0.012,50)
+
+
+
     
     # setting up flow field
     #u, v = vel_form(cen_list, dim, ratio_list)
     if flowfield_mode == 'ON':
-        x_field, y_field, u_field, v_field = circular_velocity_field(int(dim/2), 2.0)
+        # x_field, y_field, u_field, v_field = circular_velocity_field(int(dim/2), 2.0)
+        x_field, y_field, u_field, v_field = h.circular_velocity_field(0.012)
     else:
-        x_field, y_field, u_field, v_field = circular_velocity_field(int(dim/2), 0.0)
+        # x_field, y_field, u_field, v_field = circular_velocity_field(int(dim/2), 0.0)
+        x_field, y_field, u_field, v_field = h.circular_velocity_field()
+
+    
     # use u and v to update position of purusers and evaders. 
     #plt.quiver(x_field,y_field,u_field,v_field)
     #plt.show()
@@ -354,6 +440,7 @@ def play_game():
         # Visualize
         if display_game:
             screen.fill((255,255,255))
+            h.draw(screen)
             [p.display(screen, scale, width) for p in P]
             [e.display(screen, scale, width) for e in E]
             clock.tick(30)
