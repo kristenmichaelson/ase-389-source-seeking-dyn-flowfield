@@ -162,8 +162,8 @@ class VectorField():
 
     def circular_velocity_field(self,scale):
         x_field, y_field = np.meshgrid(np.linspace(-dim,dim,self.step),np.linspace(-dim,dim,self.step))
-        u_field = -scale*y_field/np.sqrt(x_field**2 + y_field**2)
-        v_field = scale*x_field/np.sqrt(x_field**2 + y_field**2)
+        u_field = scale*y_field/np.sqrt(x_field**2 + y_field**2)
+        v_field = -scale*x_field/np.sqrt(x_field**2 + y_field**2)
         return x_field, y_field, u_field, v_field
 
     def _generate_vectors(self):
@@ -209,8 +209,8 @@ def circular_velocity_field(scale):
     
     x_field, y_field = np.meshgrid(np.linspace(-dim,dim,2*dim+1),np.linspace(-dim,dim,2*dim+1))
 
-    u_field = -scale*y_field/np.sqrt(x_field**2 + y_field**2)
-    v_field = scale*x_field/np.sqrt(x_field**2 + y_field**2)
+    u_field = scale*y_field/np.sqrt(x_field**2 + y_field**2)
+    v_field = -scale*x_field/np.sqrt(x_field**2 + y_field**2)
     return x_field, y_field, u_field, v_field
 
 def min_dist(evader, list_of_pursuers): 
