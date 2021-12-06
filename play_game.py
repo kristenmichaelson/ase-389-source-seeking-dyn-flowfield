@@ -1,6 +1,5 @@
 import numpy as np
 import math
-# import assign_pairs
 import random
 from numpy.lib.function_base import disp
 import matplotlib.pyplot as plt
@@ -8,17 +7,18 @@ import pygame
 import time
 from scipy.optimize import linear_sum_assignment
 from math import hypot, atan2, sin, cos, pi;
-# from multipledispatch import dispatch
 
 # global variables
 n = 7 # number of pursuers (0 to n-1)
 m = 7 # number of evaders (0 to m-1)
 
 #flow field 
-dim = 6
+dim = 30
 round_ = 1
 cen_list = [(7 + round_ - 1, 7+ round_ - 1), (42 - round_ + 1, 45 - round_ + 1), (6 + round_ - 1, 45 - round_ + 1)]    
 ratio_list = [0.95/5.0, 0.15/5.0, 1.35/5.0]
+
+F = 2.0 # velocity of vehicle relative to flow field
 
 class Evader():
     def __init__(self, x, y, id, size=10):
@@ -125,8 +125,8 @@ class Pursuer():
 WIDTH= 600 
 HEIGHT = 600
 
-x_units, y_units = 8, 8;
-hwidth, hheight = WIDTH / 2, HEIGHT / 2;
+x_units, y_units = 8, 8
+hwidth, hheight = WIDTH / 2, HEIGHT / 2
 x_scale, y_scale = WIDTH / x_units, HEIGHT / y_units
 
 ### Converts to rectangular form
@@ -188,10 +188,7 @@ class VectorField():
 
     def draw(self, surf):
         for vector in self.vectors:
-            draw_arrow(translate_and_scale(vector[0], vector[1]), translate_and_scale(vector[2], vector[3]), surf);
-
-
-
+            draw_arrow(translate_and_scale(vector[0], vector[1]), translate_and_scale(vector[2], vector[3]), surf)
 
 
 #This is to generate some velocity field
@@ -208,9 +205,9 @@ def vel_form(centers, dim, list_):
         u, v = u + list_[i]*u1[1:, 1:].copy(), v + list_[i]*v1[1:, 1:].copy()
     return u, v
 
-def circular_velocity_field(dim, scale):
+def circular_velocity_field(scale):
     
-    x_field, y_field = np.meshgrid(np.linspace(-dim,dim,2*dim),np.linspace(-dim,dim,2*dim))
+    x_field, y_field = np.meshgrid(np.linspace(-dim,dim,2*dim+1),np.linspace(-dim,dim,2*dim+1))
 
     u_field = -scale*y_field/np.sqrt(x_field**2 + y_field**2)
     v_field = scale*x_field/np.sqrt(x_field**2 + y_field**2)
@@ -262,8 +259,6 @@ def task_assignment(P,E):
             e2a = []
             p2a = []
 
-     
-
 ## capture distance for pursuers and evader.
 def capture_dist (p,e,d):
      dist = (p.x - e.x)**2 + (p.y- e.y)**2
@@ -272,10 +267,6 @@ def capture_dist (p,e,d):
 def capture_dist2 (p,e):
     dist = (p.x - e.x)**2 + (p.y- e.y)**2
     return dist
-
-
-
-
 
 ## helper function to find minimum cost(distance) using the hungarian linear assignment algorithm 
 ## Adapted from (Algorithm 2 -Zang )
@@ -291,9 +282,64 @@ def hungarian_lap(P,E):
 
     return row_ind,col_ind
 
-
-
 ### Helper to find reachability set 
+
+def forward_reachable_set(agent, x_field, y_field, v_field, u_field, dt, t):
+
+    # initialization 
+    
+    iterations = 15
+
+    x_phi, y_phi = np.meshgrid(np.linspace(-dim,dim,2*dim+1),np.linspace(-dim,dim,2*dim+1))
+    x_phi = x_phi - agent.x 
+    y_phi = y_phi - agent.y 
+    phi = np.sqrt(x_phi**2 + y_phi**2)
+    
+    # forward propagation
+    for k in range(iterations):
+        dphi = np.gradient(phi)
+        x_dphi, y_dphi = np.gradient(phi)
+        dphi_norm = np.sqrt(np.sum(np.square(dphi),axis=0))
+
+        field_dphi = np.zeros([2*dim+1,2*dim+1])
+        for i in range(2*dim+1):
+            for j in range(2*dim+1):
+                a = np.array([v_field[i,j], u_field[i,j]])
+                b = np.array([x_dphi[i,j], y_dphi[i,j]])
+                field_dphi[i,j] = a @ b
+
+        phi = phi - dt*F*dphi_norm - field_dphi *dt
+
+        #plt.quiver(x_field,y_field,x_phi, y_phi)
+        #cs = plt.contour(x_field,y_field,phi,levels=[-2, 0, 2],colors=['#808080', '#A0A0A0', '#C0C0C0'], extend='both')
+        #cs.cmap.set_over('red')
+        #cs.cmap.set_under('blue')
+        #cs.changed()
+        
+        plt.quiver(x_field,y_field,u_field,v_field)
+        plt.scatter(agent.x,agent.y)
+        plt.contour(x_field,y_field,phi,0)
+        #plt.title(k)
+        plt.clf()
+        #plt.show()
+
+    return phi, dphi_norm, x_dphi, y_dphi
+
+
+def is_within_reachable(e, x_field,y_field, phi):
+    
+    coordinates = np.where(phi<=0.1)
+    cx, cy = coordinates
+    cx = cx - dim
+    cy = cy - dim
+    plt.contour(x_field,y_field,phi,0)
+    plt.scatter(cx,cy)
+    #plt.show()
+    return e.x in cx and e.y in cy
+
+def toc(phi, dphi_norm, x_dphi, y_dphi):
+    scaling_factor = 0.52
+    return F * x_dphi, F* y_dphi # @ np.linalg.inv(dphi_norm)
 
 def time_to_capture(p,e):
     ## Assumed they moved in same direction/ flow field direction
@@ -315,8 +361,8 @@ def time_reachability(P,E):
 
 def play_game():
     flowfield_mode = 'ON' # flowfield mode: 'ON' or 'OFF'
-    task_assign_mode = 'HUNGARIAN' # task assignment mode: 'ZAVLANOS' or 'HUNGARIAN' or 'MATRIX'
-    display_game = True
+    task_assign_mode = 'HUNGARIAN' # task assignment mode: 'ZAVLANOS' or 'HUNGARIAN' 
+    display_game = True #True
 
     print("Playing...")
 
@@ -328,7 +374,7 @@ def play_game():
         # https://www.pygame.org/docs/tut/PygameIntro.html
         size = width, height = 600, 600 # display size 500 x 500 px
         screen = pygame.display.set_mode(size)
-        scale = width / 6
+        scale = width / 60
         font = pygame.font.SysFont(None, 100)
         # Wait 3 seconds (for screen recording)
         time.sleep(3)
@@ -353,8 +399,9 @@ def play_game():
         e = Evader(x, y, ii)
         E.append(e)
 
-    dt = 0.01
+    dt = 1
 
+    
 
     function = lambda x, y: (-sin(y), x)
     h = VectorField(function,int(dim/2), 0.012,50)
@@ -365,11 +412,11 @@ def play_game():
     # setting up flow field
     #u, v = vel_form(cen_list, dim, ratio_list)
     if flowfield_mode == 'ON':
-        # x_field, y_field, u_field, v_field = circular_velocity_field(int(dim/2), 2.0)
-        x_field, y_field, u_field, v_field = h.circular_velocity_field(0.012)
+        #x_field, y_field, u_field, v_field = circular_velocity_field(int(dim/2), 2.0)
+        x_field, y_field, u_field, v_field = circular_velocity_field(0.5)
     else:
         # x_field, y_field, u_field, v_field = circular_velocity_field(int(dim/2), 0.0)
-        x_field, y_field, u_field, v_field = h.circular_velocity_field()
+        x_field, y_field, u_field, v_field = circular_velocity_field(0.0)
 
     
     # use u and v to update position of purusers and evaders. 
@@ -419,10 +466,19 @@ def play_game():
         for p_ind, e_ind in A:
             e = E[e_ind]
             # Compute optimal velocity using Zavlanos method
-            vx, vy = P[p_ind].vel(e.x, e.y, t, t0) 
+            #vx, vy = P[p_ind].vel(e.x, e.y, t, t0) 
+            
             # Add in flowfield velocities
-            vx += u_field[int(P[ii].x + dim/2), int(P[ii].y + dim/2)] # should this be u_field or v_field?
-            vy += v_field[int(P[ii].x + dim/2), int(P[ii].y + dim/2)]
+            print("pursuer's location:", P[p_ind].x, P[p_ind].y)
+            vx = v_field[int(P[p_ind].x + dim), int(P[p_ind].y + dim)] 
+            vy = u_field[int(P[p_ind].x + dim), int(P[p_ind].y + dim)]
+            
+            
+            # Compute optimal velocity from HJ equation if within reachability set
+            #phi, dphi_norm, x_dphi, y_dphi = forward_reachable_set(P[p_ind], x_field, y_field, v_field, u_field, dt, t)
+            #if is_within_reachable(E[e_ind], x_field,y_field, phi):
+            #    vx, vy = toc(phi, dphi_norm, x_dphi, y_dphi)
+
             P[p_ind].vx = vx
             P[p_ind].vy = vy
             P[p_ind].move(vx, vy, dt)
@@ -433,7 +489,9 @@ def play_game():
                 E[ii].move(vx, vy, dt)
             else:
                 #breakpoint()
-                E[ii].move(v_field[int(E[ii].x + dim/2), int(E[ii].y + dim/2)], u_field[int(E[ii].x + dim/2), int(E[ii].y + dim/2)], dt)
+                print("evader's location:", E[ii].x, E[ii].y)
+                E[ii].move(v_field[int(E[ii].x + dim), int(E[ii].y + dim)], u_field[int(E[ii].x + dim), int(E[ii].y + dim)], dt)
+                
                 # something like: E[ii].move(vx + v_field[E[ii].x], vy + u_field[E[ii].y], dt)
                 # check if the dimensions of velocity field is same as dimensions (and range of axis) to the grid for pursuers and evaders that Kristen coded
 
