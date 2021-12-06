@@ -240,7 +240,7 @@ def time_reachability(P,E):
 
 def play_game():
     flowfield_mode = 'ON' # flowfield mode: 'ON' or 'OFF'
-    task_assign_mode = 'HUNGARIAN' # task assignment mode: 'ZAVLANOS' or 'HUNGARIAN' or 'MATRIX'
+    task_assign_mode = 'ZAVLANOS' # task assignment mode: 'ZAVLANOS' or 'HUNGARIAN' or 'MATRIX'
     display_game = True
 
     print("Playing...")
@@ -335,8 +335,8 @@ def play_game():
             # Compute optimal velocity using Zavlanos method
             vx, vy = P[p_ind].vel(e.x, e.y, t, t0) 
             # Add in flowfield velocities
-            vx += u_field[int(P[ii].x + dim/2), int(P[ii].y + dim/2)] # should this be u_field or v_field?
-            vy += v_field[int(P[ii].x + dim/2), int(P[ii].y + dim/2)]
+            vx += v_field[int(P[ii].x + dim/2), int(P[ii].y + dim/2)] # should this be u_field or v_field?
+            vy += u_field[int(P[ii].x + dim/2), int(P[ii].y + dim/2)]
             P[p_ind].vx = vx
             P[p_ind].vy = vy
             P[p_ind].move(vx, vy, dt)
