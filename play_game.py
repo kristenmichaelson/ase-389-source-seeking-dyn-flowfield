@@ -18,10 +18,10 @@ round_ = 1
 cen_list = [(7 + round_ - 1, 7+ round_ - 1), (42 - round_ + 1, 45 - round_ + 1), (6 + round_ - 1, 45 - round_ + 1)]    
 ratio_list = [0.95/5.0, 0.15/5.0, 1.35/5.0]
 
-F = 2.0 # velocity of vehicle relative to flow field
+F = 0.75 # velocity of vehicle relative to flow field
 
 class Evader():
-    def __init__(self, x, y, id, size=10):
+    def __init__(self, x, y, id, size=1):
         self.x = x
         self.y = y
         self.size = size # px
@@ -52,7 +52,7 @@ class Evader():
 
 
 class Pursuer():
-    def __init__(self, x, y,id, size=10):
+    def __init__(self, x, y,id, size=1):
         self.x = x
         self.y = y
         self.size = size
@@ -69,7 +69,7 @@ class Pursuer():
         self.text = self.font.render(str(self.ID), True, (205,51,51))
         self.vx = 0
         self.vy = 0
-
+        self.reachability_front = np.zeros((2*dim+1, 2*dim+1))
 
 
 
@@ -162,8 +162,8 @@ class VectorField():
 
     def circular_velocity_field(self,scale):
         x_field, y_field = np.meshgrid(np.linspace(-dim,dim,self.step),np.linspace(-dim,dim,self.step))
-        u_field = scale*y_field/np.sqrt(x_field**2 + y_field**2)
-        v_field = -scale*x_field/np.sqrt(x_field**2 + y_field**2)
+        u_field = -scale*y_field/np.sqrt(x_field**2 + y_field**2)
+        v_field = scale*x_field/np.sqrt(x_field**2 + y_field**2)
         return x_field, y_field, u_field, v_field
 
     def _generate_vectors(self):
@@ -209,8 +209,8 @@ def circular_velocity_field(scale):
     
     x_field, y_field = np.meshgrid(np.linspace(-dim,dim,2*dim+1),np.linspace(-dim,dim,2*dim+1))
 
-    u_field = scale*y_field/np.sqrt(x_field**2 + y_field**2)
-    v_field = -scale*x_field/np.sqrt(x_field**2 + y_field**2)
+    u_field = -scale*y_field/np.sqrt(x_field**2 + y_field**2)
+    v_field = scale*x_field/np.sqrt(x_field**2 + y_field**2)
     return x_field, y_field, u_field, v_field
 
 def min_dist(evader, list_of_pursuers): 
@@ -288,13 +288,12 @@ def forward_reachable_set(agent, x_field, y_field, v_field, u_field, dt, t):
 
     # initialization 
     
-    iterations = 15
+    iterations = 2
 
     x_phi, y_phi = np.meshgrid(np.linspace(-dim,dim,2*dim+1),np.linspace(-dim,dim,2*dim+1))
     x_phi = x_phi - agent.x 
     y_phi = y_phi - agent.y 
     phi = np.sqrt(x_phi**2 + y_phi**2)
-    
     # forward propagation
     for k in range(iterations):
         dphi = np.gradient(phi)
@@ -309,25 +308,26 @@ def forward_reachable_set(agent, x_field, y_field, v_field, u_field, dt, t):
                 field_dphi[i,j] = a @ b
 
         phi = phi - dt*F*dphi_norm - field_dphi *dt
-
+        #breakpoint()
         #plt.quiver(x_field,y_field,x_phi, y_phi)
         #cs = plt.contour(x_field,y_field,phi,levels=[-2, 0, 2],colors=['#808080', '#A0A0A0', '#C0C0C0'], extend='both')
         #cs.cmap.set_over('red')
         #cs.cmap.set_under('blue')
         #cs.changed()
         
-        plt.quiver(x_field,y_field,u_field,v_field)
-        plt.scatter(agent.x,agent.y)
-        plt.contour(x_field,y_field,phi,0)
+        #plt.quiver(x_field,y_field,u_field,v_field)
+        #plt.scatter(agent.x,agent.y)
+        #plt.contour(x_field,y_field,phi,0)
         #plt.title(k)
-        plt.clf()
+        #plt.clf()
         #plt.show()
-
+    phi = np.nan_to_num(phi, nan = -9.99)
+    dphi_norm = np.nan_to_num(dphi_norm, nan = -99.99)
+    field_dphi = np.nan_to_num(field_dphi, nan = -99.99)
     return phi, dphi_norm, x_dphi, y_dphi
 
 
 def is_within_reachable(e, x_field,y_field, phi):
-    
     coordinates = np.where(phi<=0.1)
     cx, cy = coordinates
     cx = cx - dim
@@ -335,11 +335,12 @@ def is_within_reachable(e, x_field,y_field, phi):
     plt.contour(x_field,y_field,phi,0)
     plt.scatter(cx,cy)
     #plt.show()
-    return e.x in cx and e.y in cy
+    #breakpoint()
+    return int(e.x) in cx and int(e.y) in cy
 
 def toc(phi, dphi_norm, x_dphi, y_dphi):
     scaling_factor = 0.52
-    return F * x_dphi, F* y_dphi # @ np.linalg.inv(dphi_norm)
+    return F * x_dphi , F* y_dphi # @ np.linalg.inv(dphi_norm)
 
 def time_to_capture(p,e):
     ## Assumed they moved in same direction/ flow field direction
@@ -387,16 +388,17 @@ def play_game():
     for ii in range(n):
         x = random.random() - 2.0
         y = random.random() - 2.0
-        p = Pursuer(x, y,ii)
+        p = Pursuer(x, y,ii,10)
         P.append(p)
 
     E = []
-    R = 2.0
+    R = 7.0
     for ii in range(m):
         a = (2 * math.pi / m) * ii
         x = R * np.cos(a)
         y = R * np.sin(a)
-        e = Evader(x, y, ii)
+        e = Evader(x, y, ii,10)
+        print("Evader position:", x, y)
         E.append(e)
 
     dt = 1
@@ -404,7 +406,7 @@ def play_game():
     
 
     function = lambda x, y: (-sin(y), x)
-    h = VectorField(function,int(dim/2), 0.012,50)
+    h = VectorField(function,int(dim/2), 0.5,50)
 
 
 
@@ -428,7 +430,7 @@ def play_game():
     
     t0 = 0.0
     t = t0
-
+    plt.plot()
     while not is_game_over:
 
         for event in pygame.event.get():
@@ -443,6 +445,9 @@ def play_game():
             for p_ind in range(n):
                 if len(P[p_ind].I_a) == 1:
                     A.append((p_ind, P[p_ind].I_a[0]))
+            if not A:
+                p,e = hungarian_lap(P,E)
+                A = list(zip(p,e))
         elif task_assign_mode == 'HUNGARIAN':
             p,e = hungarian_lap(P,E)
             A = list(zip(p,e))
@@ -461,7 +466,6 @@ def play_game():
             print("Evader ", ii ," location: ", evader.x, evader.y, "Pursuer Assignment",evader.ID)
             ii = ii + 1
         '''
-
         # Integrate dynamics
         for p_ind, e_ind in A:
             e = E[e_ind]
@@ -469,19 +473,38 @@ def play_game():
             #vx, vy = P[p_ind].vel(e.x, e.y, t, t0) 
             
             # Add in flowfield velocities
-            print("pursuer's location:", P[p_ind].x, P[p_ind].y)
+            #print("pursuer's location:", P[p_ind].x, P[p_ind].y)
             vx = v_field[int(P[p_ind].x + dim), int(P[p_ind].y + dim)] 
             vy = u_field[int(P[p_ind].x + dim), int(P[p_ind].y + dim)]
             
             
             # Compute optimal velocity from HJ equation if within reachability set
-            #phi, dphi_norm, x_dphi, y_dphi = forward_reachable_set(P[p_ind], x_field, y_field, v_field, u_field, dt, t)
-            #if is_within_reachable(E[e_ind], x_field,y_field, phi):
-            #    vx, vy = toc(phi, dphi_norm, x_dphi, y_dphi)
-
+            phi, dphi_norm, x_dphi, y_dphi = forward_reachable_set(P[p_ind], x_field, y_field, v_field, u_field, dt, t)
+            P[p_ind].reachability_front = phi
+            
+            if is_within_reachable(E[e_ind], x_field, y_field, phi):
+                vxf, vyf = toc(phi, dphi_norm, x_dphi, y_dphi)
+                print("velocity commands:")
+                #breakpoint()
+                if not math.isnan(vxf[int(P[p_ind].x + dim), int(P[p_ind].y + dim)]):
+                    vx = vxf[int(P[p_ind].x + dim), int(P[p_ind].y + dim)] # something wrong here maybe, dim is 61, close enough for dim/2
+                    print(vx)
+                if not math.isnan(vyf[int(P[p_ind].x + dim), int(P[p_ind].y + dim)]):
+                    vy = vyf[int(P[p_ind].x + dim), int(P[p_ind].y + dim)]
+                    print(vy)
+                
             P[p_ind].vx = vx
             P[p_ind].vy = vy
             P[p_ind].move(vx, vy, dt)
+        
+        plt.quiver(x_field,y_field,u_field,v_field)
+        for i in range(m):
+            plt.scatter(E[i].x,E[i].y,  marker='*')
+        for i in range(n):
+            plt.scatter(P[i].x,P[i].y,  marker='^')
+        for ii in range(n):
+            plt.contour(x_field,y_field,P[ii].reachability_front,0)
+        #plt.show()
 
         for ii in range(m):
             if flowfield_mode == 'OFF':
@@ -489,7 +512,7 @@ def play_game():
                 E[ii].move(vx, vy, dt)
             else:
                 #breakpoint()
-                print("evader's location:", E[ii].x, E[ii].y)
+                #print("evader's location:", E[ii].x, E[ii].y)
                 E[ii].move(v_field[int(E[ii].x + dim), int(E[ii].y + dim)], u_field[int(E[ii].x + dim), int(E[ii].y + dim)], dt)
                 
                 # something like: E[ii].move(vx + v_field[E[ii].x], vy + u_field[E[ii].y], dt)
@@ -507,7 +530,7 @@ def play_game():
         v= []
         if len(A) == n:
              for i in A:
-                if (True == capture_dist(P[i[0]],E[i[1]],0.01)):
+                if (True == capture_dist(P[i[0]],E[i[1]],1.0)):
                       v.append(i[0])
         if len(v) == n:
              is_game_over = True
