@@ -7,7 +7,6 @@ import pygame
 import time
 from scipy.optimize import linear_sum_assignment
 from math import hypot, atan2, sin, cos, pi
-from LevelSet import calc_gradient
 
 # global variables
 n = 7 # number of pursuers (0 to n-1)
