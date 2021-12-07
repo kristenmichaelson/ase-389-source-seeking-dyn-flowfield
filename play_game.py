@@ -436,7 +436,8 @@ def toc(p, e, x_field, y_field, v_field, u_field, dphi_norm_history, x_dphi_hist
         # update x_dphi and dphi_norm with time 
         y_dphi = y_dphi_history[-k][1]
         x_dphi = x_dphi_history[-k][1]
-        dphi_norm = dphi_norm_history[-k][1]
+        #dphi_norm = dphi_norm_history[-k][1]
+        dphi_norm = np.sqrt(x_dphi**2 + y_dphi**2)
 
         vx = -v_field[int(yfx + dim), int(yfy + dim)] - F * x_dphi[int(yfx + dim), int(yfy + dim)] * 1/(dphi_norm[int(yfx + dim), int(yfy + dim)])
         vy = -u_field[int(yfx + dim), int(yfy + dim)] - F * y_dphi[int(yfx + dim), int(yfy + dim)] * 1/(dphi_norm[int(yfx + dim), int(yfy + dim)])
@@ -446,7 +447,7 @@ def toc(p, e, x_field, y_field, v_field, u_field, dphi_norm_history, x_dphi_hist
         print("Positions:", yfx, yfy)
         #plt.scatter(yfx,yfy)
         #plt.show()
-
+        #breakpoint()
     return vx,vy
 
 def time_to_capture(p,e):
@@ -470,7 +471,7 @@ def time_reachability(P,E):
 def play_game():
     flowfield_mode = 'ON' # flowfield mode: 'ON' or 'OFF'
     task_assign_mode = 'HUNGARIAN' # task assignment mode: 'ZAVLANOS' or 'HUNGARIAN' 
-    display_game = False #True
+    display_game = True #True
 
     print("Playing...")
 
@@ -581,13 +582,13 @@ def play_game():
             
             # Add in flowfield velocities
             #print("pursuer's location:", P[p_ind].x, P[p_ind].y)
-            vx = v_field[int(P[p_ind].x + dim), int(P[p_ind].y + dim)] 
-            vy = u_field[int(P[p_ind].x + dim), int(P[p_ind].y + dim)]
+            # vx = v_field[int(P[p_ind].x + dim), int(P[p_ind].y + dim)] 
+            # vy = u_field[int(P[p_ind].x + dim), int(P[p_ind].y + dim)]
             
             
             # Compute optimal velocity from HJ equation if within reachability set
-            vx, vy = dphi_norm_history, x_dphi_history, y_dphi_history, T = forward_reachable_set(P[p_ind], e, x_field, y_field, v_field, u_field, dt, t)
-            breakpoint()
+            vx, vy = forward_reachable_set(P[p_ind], e, x_field, y_field, v_field, u_field, dt, t)
+            #breakpoint()
             #P[p_ind].reachability_front = phi
             
             # if is_within_reachable(E[e_ind], x_field, y_field, phi):
