@@ -95,7 +95,7 @@ Given \textit{n} identical pursuers and evaders and no prior assignment informat
 
 <h4>Specific Aim</h4> 
 
-     <p>   We first aim to replicate the results presented in \cite{b4}, \textit{Distributed Hybrid Control for Multiple-Pursuer Multiple-Evader Games}. We will begin with equal numbers of pursuers and evaders (although \cite{b4} also extends to a formulation with more evaders than pursuers). In this work, both the pursuers' and evaders' dynamics are simple motion. The pursuers' control inputs $u_i$ are velocity vectors. The evaders do not strategize; instead, they follow pre-defined trajectories. Fig.\ref{fig:MMAS Figure} shows the time-evolution of a game with 7 players. 
+     <p>   We first aim to replicate the results presented in the paper, Distributed Hybrid Control for Multiple-Pursuer Multiple-Evader Games. We will begin with equal numbers of pursuers and evaders (although the paper also extends to a formulation with more evaders than pursuers). In this work, both the pursuers' and evaders' dynamics are simple motion. The pursuers' control inputs $u_i$ are velocity vectors. The evaders do not strategize; instead, they follow pre-defined trajectories. The above figure shows the time-evolution of a game with 7 players. 
 
         The pursuers start off gathered in one area. Meanwhile, the evaders begin to move in a circle. Eventually, the pursuers capture all the evaders.
 
@@ -106,18 +106,22 @@ Given \textit{n} identical pursuers and evaders and no prior assignment informat
         \end{equation}
         where $\varphi_{R,a}(x_i, y_k, t)$ is a potential function defined as $\varphi_{R,a}(x_i, y_k, t) = \frac{1}{r^2(t) - \gamma^2(x_i, y_k)}$. 
 
-        We aim to replicate their online task assignment policy; making sure all evaders are pursued. Next, we aim to extend \cite{b4} to a game scenario in a dynamic flow field. The flow field will be known to the pursuers, and a new mapping from states to strategies (eq. \ref{eq:3}) will be developed based on this new information structure. Fig. \ref{fig:MMAS Figure} was adapted from \cite{b4} to demonstrate how this might look. 
+        We aim to replicate their online task assignment policy; making sure all evaders are pursued. Next, we aim to extend Zavlanos et. al work to a game scenario in a dynamic flow field. The flow field will be known to the pursuers, and a new mapping from states to strategies (eq. \ref{eq:3}) will be developed based on this new information structure. The above figure was adapted from the Zavlanos et. al work to demonstrate how this might look. 
 
         Additional possible extensions include:
-        \begin{enumerate}
-            \item Pursuers must estimate the flow field.
-            \item Pursuers must estimation positions of evaders at each time steps.
-            \item Smarter evaders with knowledge of pursuers strategies maximizing their cost and making capture difficult for the pursuers.
-        \end{enumerate}
+ 
+        <ul>
+            <li>Pursuers must estimate the flow field.
+            </li>
+            <li>Pursuers must estimation positions of evaders at each time steps.
+            </li>
+            <li>Smarter evaders with knowledge of pursuers strategies maximizing their cost and making capture difficult for the pursuers.}
+            </li>
+        </ul>
 
     </p>
 
-    <h4>Technical Approach</h4> 
+    <h4>Navigation Approach 1</h4> 
     <p>The pursuer strategy is defined in equation \ref{eq:3}. 
         Evaluating the gradient term, we have
         \begin{equation} 
@@ -126,20 +130,63 @@ Given \textit{n} identical pursuers and evaders and no prior assignment informat
         \begin{equation} 
             v_y = - 2K \frac{1}{\beta^2}(p_y - e_y)
         \end{equation}
-
-    The $\beta^2$ term in the denominator makes things tricky. 
-    It can cause poor behavior if the constants $a$, $R$, and $K$ are not tuned appropriately.
-    In the results presented here, $a$, $R$, and $K$ are tuned specifically for the task assignment algorithm defined in Zavlanos and Pappas (2007). 
     
-    <h5>Hungarian Algorithm</h5>
+    <h4>Navigation Approach 2</h4> 
+    <p>The second approach of puruser navigation we tested was based on forward reachability set. We can show that the viscosity solution to the Hamilton-Jacobi equation governs the reachable set R(ys,t), where R(ys,t) = {x : φ(x, t) ≤ 0}.
+        
+        \begin{equation} 
+            \frac{\delta \phi_0}{\delta t} + F |\nabla \phi_0| + V(x,t).\nabla \phi_0 = 0
+        \end{equation}
+        with the initial condition
+        \begin{equation} 
+            \phi_0(x,0) = |x-y_s|
+        \end{equation}
+
+    The level set equation governing the evolution of a front moving in a direction normal to itself at a constant speed F (> 0) and in a stationary environment. This implies that the vehicle’s optimal relative speed equals F, and its optimal heading is normal to the level sets of φ.
+    Once the reachability front reaches the evader's location, we can find the optimal velocity control for the puruser to capture evader in the minimum time, using the following solution:
+
+    \begin{equation} 
+            \frac{dX^*_p}{dt} = F \frac{\nabla \phi_0(dX^*_p,t)}{|\nabla \phi_0(dX^*_p,t)|} + V(X^*_t,t)
+    \end{equation}
+
+    <h4>Task Assignment Approach 1</h4>
+    <p > We employed a hybrid system model with a number of discrete states functioning as a finite automaton; Each discrete state itself is comprised of a continuous dynamic process that could be modelled by differential or difference equation, and account for control inputs and disturbances. The hybrid task assignment and coupled navigation automaton approach allows our solution to be scalable; we can create a high-dimension representation for a nmulti-agent system and consider all states of the system. Our navigation and task assignment strategies follow these automatons, taken from Zalvanos et. al:
+   </p>
+
+    <head>
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <title>HTML</title>
+        <style>	
+            .column {
+              float: left;
+              width: 50%;
+              padding: 5px;
+            }
+            img {
+              width: 100%;
+            }	
+        </style>
+        </head>
+    <div class="container">
+        <div class="column">
+          <img src="assets/Navigation.png" alt="image1">
+          <figcaption>Navigation of n-pursuers</figcaption-->
+        </div>
+        <div class="column">
+          <img src="assets/Coordination.png" alt="image1">
+          <figcaption>Coordination Automaton  of n-pursuers</figcaption--> 
+        </div>
+     </div>
+
+    <h4>Task Assignment Approach 2</h4>
     <p > For finding the initial assignment that minimizes the pair wise distance between evaders and pursuers. we used a version
     of the Hungarian algorithm. To that end we solved a linear assignment problem by constructing a cost matrix based on the distance between pursers and evader.
     We simulated result with both the dynamic flow field and without. 
    </p>
   
-    <h5>Time to Capture Minimization</h5> 
+   <h4>Task Assignment Approach 3</h4>  
     <p>
-        Similar to the procedure in the hungarian method we implemented cost matrix based on the time to capture.
+        Similar to the procedure in the hungarian method, we implemented a cost matrix based on the time to capture to minimize it. 
     </p>
 
 
@@ -170,11 +217,9 @@ Given \textit{n} identical pursuers and evaders and no prior assignment informat
     </p>
 
 
-    <p><a href= "https://github.com/kristenmichaelson/ase-389-source-seeking-dyn-flowfield">Code implementation can be found here</p>
-
-    
-       
+        <div>
             <h3>References</h3>
+            <p><a href= "https://github.com/kristenmichaelson/ase-389-source-seeking-dyn-flowfield">Code implementation can be found here</p>
              <p><a href="https://arxiv.org/pdf/2103.15660.pdf">Pursuer Assignment and Control Strategies in Multi-agent Pursuit-Evasion, Zhang, Prorok and Bhattacharya, 2021.</a></p>
              <p><a href="http://dcsl.gatech.edu/papers/jgcd16%20(Printed).pdf"> Multiple-pursuer/one-evader pursuit-evasion game in dynamic flowfields, Sun, Tsiotras, Lolla, Subramani, and Lermusiaux, 2017.
             </a></p>
@@ -182,10 +227,23 @@ Given \textit{n} identical pursuers and evaders and no prior assignment informat
             </a> </p>
             <p><a href="https://people.duke.edu/~mz61/papers/2007HSCC_Zavlanos_PursuerEvaderGames_Extended.pdf"> Distributed hybrid control for multiple-pursuer multiple-evader games,Zavlanos and Pappas, 2007. </a></p>
 
-
-
+            <h3>Future Work</h3>
+            <p > 
+                <ul>
+                    <li>Pursuers to collaboratively estimate the (adversarial) flow field and localize all evaders at  each time step via concentration measurements.
+                    </li>
+                    <li>Smarter evaders with knowledge of pursuers strategies maximising their cost  making capture difficult for the pursuers.
+                    </li>
+                    <li>Obstacles; simple integration with our forward reachable set approach. 
+                    </li>
+                    <li>
+                        Test on hardware. 
+                    </li>
+                </ul>
+            </p>
             
-            <h4>Video</h4>
+            
+            <h3>Video</h3>
                 <div align="center">
                        <!-- <iframe width="640" height="400" src="" frameborder="0" allowfullscreen/> -->
                        <iframe width="560" height="315" src="https://www.youtube.com/embed/hy1B8wpOd58" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
@@ -195,9 +253,13 @@ Given \textit{n} identical pursuers and evaders and no prior assignment informat
 
             </div>
           
-              
+
+
         </div>
 
+
+         
+   
         <!-- Bootstrap core JS-->
         <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
         <!-- Core theme JS-->
