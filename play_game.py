@@ -6,7 +6,8 @@ import matplotlib.pyplot as plt
 import pygame
 import time
 from scipy.optimize import linear_sum_assignment
-from math import hypot, atan2, sin, cos, pi;
+from math import hypot, atan2, sin, cos, pi
+from LevelSet import calc_gradient
 
 # global variables
 n = 7 # number of pursuers (0 to n-1)
@@ -164,6 +165,8 @@ class VectorField():
         x_field, y_field = np.meshgrid(np.linspace(-dim,dim,self.step),np.linspace(-dim,dim,self.step))
         u_field = -scale*y_field/np.sqrt(x_field**2 + y_field**2)
         v_field = scale*x_field/np.sqrt(x_field**2 + y_field**2)
+        u_field = np.nan_to_num(u_field, nan = -0.01)
+        v_field = np.nan_to_num(v_field, nan = 0.01)
         return x_field, y_field, u_field, v_field
 
     def _generate_vectors(self):
@@ -211,6 +214,8 @@ def circular_velocity_field(scale):
 
     u_field = -scale*y_field/np.sqrt(x_field**2 + y_field**2)
     v_field = scale*x_field/np.sqrt(x_field**2 + y_field**2)
+    u_field = np.nan_to_num(u_field, nan = -0.01)
+    v_field = np.nan_to_num(v_field, nan = 0.01)
     return x_field, y_field, u_field, v_field
 
 def min_dist(evader, list_of_pursuers): 
@@ -283,64 +288,167 @@ def hungarian_lap(P,E):
     return row_ind,col_ind
 
 ### Helper to find reachability set 
+def first_order_upwind_norm(phi):
+    nrows, ncols = phi.shape
+    upwind_norm = np.zeros((nrows, ncols))
+    for i in range(1,nrows-1):
+        for j in range(1,ncols-1):
+            row1 = np.square(np.max(phi[i,j]-phi[i-1,j]-phi[i+1,j]+phi[i,j],0))
+            row2 = np.square(np.max(phi[i,j]-phi[i,j-1]-phi[i,j+1]+phi[i,j],0))
+            upwind_norm[i,j] = np.sqrt(row1+row2)
+    return upwind_norm
 
-def forward_reachable_set(agent, x_field, y_field, v_field, u_field, dt, t):
+def tv_norm(x):
+    """Computes the total variation norm and its gradient. From jcjohnson/cnn-vis."""
+    x_diff = x - np.roll(x, -1, axis=1)
+    y_diff = x - np.roll(x, -1, axis=0)
+    grad_norm2 = x_diff**2 + y_diff**2 + np.finfo(np.float32).eps
+    norm = np.sum(np.sqrt(grad_norm2))
+    dgrad_norm = 0.5 / np.sqrt(grad_norm2)
+    dx_diff = 2 * x_diff * dgrad_norm
+    dy_diff = 2 * y_diff * dgrad_norm
+    grad = dx_diff + dy_diff
+    grad[:, 1:] -= dx_diff[:, :-1]
+    grad[1:, :] -= dy_diff[:-1, :]
+    return norm, grad
+
+def forward_reachable_set(p, e, x_field, y_field, v_field, u_field, dt, t):
 
     # initialization 
     
-    iterations = 2
+    iterations = 25
 
     x_phi, y_phi = np.meshgrid(np.linspace(-dim,dim,2*dim+1),np.linspace(-dim,dim,2*dim+1))
-    x_phi = x_phi - agent.x 
-    y_phi = y_phi - agent.y 
-    phi = np.sqrt(x_phi**2 + y_phi**2)
+    x_phi = x_phi - p.x 
+    y_phi = y_phi - p.y 
+    phi0 = np.sqrt(x_phi**2 + y_phi**2)
+    phi = phi0
+    T = 0
+    dphi_norm_history = []
+    x_dphi_history = []
+    y_dphi_history = []
+    
+    
     # forward propagation
     for k in range(iterations):
-        dphi = np.gradient(phi)
-        x_dphi, y_dphi = np.gradient(phi)
-        dphi_norm = np.sqrt(np.sum(np.square(dphi),axis=0))
 
+        dphi = np.gradient(phi)
+        x_dphi, y_dphi = dphi
+        
+
+        # # interior nodes
+        
+
+        #######################################################
+
+        dphi_norm = np.sqrt(np.sum(np.square(dphi),axis=0))
+        #field_dphix, field_dphiy = v_field @ x_dphi, u_field @ y_dphi
+        #field_dphi = np.sqrt(field_dphix**2 + field_dphiy**2)
+        
         field_dphi = np.zeros([2*dim+1,2*dim+1])
-        for i in range(2*dim+1):
-            for j in range(2*dim+1):
+        for i in range(1,2*dim): 
+            for j in range(1,2*dim): 
                 a = np.array([v_field[i,j], u_field[i,j]])
                 b = np.array([x_dphi[i,j], y_dphi[i,j]])
                 field_dphi[i,j] = a @ b
 
-        phi = phi - dt*F*dphi_norm - field_dphi *dt
-        #breakpoint()
-        #plt.quiver(x_field,y_field,x_phi, y_phi)
-        #cs = plt.contour(x_field,y_field,phi,levels=[-2, 0, 2],colors=['#808080', '#A0A0A0', '#C0C0C0'], extend='both')
-        #cs.cmap.set_over('red')
-        #cs.cmap.set_under('blue')
-        #cs.changed()
         
-        #plt.quiver(x_field,y_field,u_field,v_field)
-        #plt.scatter(agent.x,agent.y)
-        #plt.contour(x_field,y_field,phi,0)
-        #plt.title(k)
+        dphi_norm2 = first_order_upwind_norm(phi)
+
+        # This is dot product and not element by element 
+        # iterate through rows of X
+        # for i in range(len(v_field)):
+        #     # iterate through columns of Y
+        #     for j in range(len(x_dphi[0])):
+        #         # iterate through rows of Y
+        #         for k in range(len(x_dphi)):
+        #             a = np.array([v_field[i][k], u_field[i][k]])
+        #             b = np.array([x_dphi[k][j], y_dphi[k][j]])
+        #             field_dphi[i][j] += a @ b
+
+        #phi = phi - dt*F*dphi_norm2 - field_dphi *dt
+        phi[1:2*dim,1:2*dim] = phi[1:2*dim,1:2*dim] - dt*F*dphi_norm2[1:2*dim,1:2*dim] - field_dphi[1:2*dim,1:2*dim] *dt
+
+        #######################################################
+
+
+        
+        
+        # compute norm of field_dphi with upwind first order discretization approach
+        # dphi_norm2 = first_order_upwind_norm(phi)
+        # dphibar = - F * dphi_norm2
+        # dphibarbarxf,dphibarbaryf = - v_field @ dphibar, -u_field @ dphibar
+        # dphibarbar = np.sqrt(dphibarbarxf**2 + dphibarbaryf**2)
+        # normdphibarbar, graddphibarbar = tv_norm(dphibarbar)
+        # dphi = - F * normdphibarbar
+        # phi = dphi * (dt/2) + dphibarbar * dt + dphibar * (dt/2)
+
+
+        # boundary conditions 
+        # matrix is 2*dim + 1 by 2*dim + 1
+        phi[0,:] = phi[1,:]
+        phi[2*dim,:] = phi[2*dim-1,:]
+        phi[:,0] = phi[:,1]
+        phi[:,2*dim] = phi[:,2*dim-1]
+        
+        
+        dphi_norm_history.append((T,dphi_norm2))
+        x_dphi_history.append((T,x_dphi))
+        y_dphi_history.append((T,y_dphi))
+
+        T = T+1
+        if is_within_reachable(e, x_field,y_field, phi):
+            return toc(p, e, x_field, y_field, v_field, u_field, dphi_norm_history, x_dphi_history, y_dphi_history, T, dt)
+
+        plt.quiver(x_field,y_field,u_field,v_field)
+        #plt.quiver(x_field,y_field,field_dphi)
+        #plt.quiver(x_field,y_field,dphi_norm)
+        plt.scatter(p.x,p.y)
+        plt.scatter(e.x,e.y)
+        plt.contour(x_field,y_field,phi,0)
+        plt.title(k)
         #plt.clf()
         #plt.show()
-    phi = np.nan_to_num(phi, nan = -9.99)
-    dphi_norm = np.nan_to_num(dphi_norm, nan = -99.99)
-    field_dphi = np.nan_to_num(field_dphi, nan = -99.99)
-    return phi, dphi_norm, x_dphi, y_dphi
+        #breakpoint()
+    #phi = np.nan_to_num(phi, nan = -9.99)
+    #dphi_norm = np.nan_to_num(dphi_norm, nan = -99.99)
+    #field_dphi = np.nan_to_num(field_dphi, nan = -99.99)
+    
+    #return phi, dphi_norm, x_dphi, y_dphi, dphi
 
 
 def is_within_reachable(e, x_field,y_field, phi):
-    coordinates = np.where(phi<=0.1)
+    coordinates = np.where(phi<=0)
     cx, cy = coordinates
     cx = cx - dim
     cy = cy - dim
-    plt.contour(x_field,y_field,phi,0)
-    plt.scatter(cx,cy)
+    #plt.contour(x_field,y_field,phi,0)
+    #plt.scatter(cx,cy)
     #plt.show()
     #breakpoint()
     return int(e.x) in cx and int(e.y) in cy
 
-def toc(phi, dphi_norm, x_dphi, y_dphi):
-    scaling_factor = 0.52
-    return F * x_dphi , F* y_dphi # @ np.linalg.inv(dphi_norm)
+def toc(p, e, x_field, y_field, v_field, u_field, dphi_norm_history, x_dphi_history, y_dphi_history, T, dt):
+    
+    # backtracking
+    yfx, yfy = e.x, e.y
+    for k in range(1,T+1):
+
+        # update x_dphi and dphi_norm with time 
+        y_dphi = y_dphi_history[-k][1]
+        x_dphi = x_dphi_history[-k][1]
+        dphi_norm = dphi_norm_history[-k][1]
+
+        vx = -v_field[int(yfx + dim), int(yfy + dim)] - F * x_dphi[int(yfx + dim), int(yfy + dim)] * 1/(dphi_norm[int(yfx + dim), int(yfy + dim)])
+        vy = -u_field[int(yfx + dim), int(yfy + dim)] - F * y_dphi[int(yfx + dim), int(yfy + dim)] * 1/(dphi_norm[int(yfx + dim), int(yfy + dim)])
+        
+        print("Velocities:", vx, vy)
+        yfx, yfy = yfx-vx*dt, yfy-vy*dt
+        print("Positions:", yfx, yfy)
+        #plt.scatter(yfx,yfy)
+        #plt.show()
+
+    return vx,vy
 
 def time_to_capture(p,e):
     ## Assumed they moved in same direction/ flow field direction
@@ -363,7 +471,7 @@ def time_reachability(P,E):
 def play_game():
     flowfield_mode = 'ON' # flowfield mode: 'ON' or 'OFF'
     task_assign_mode = 'HUNGARIAN' # task assignment mode: 'ZAVLANOS' or 'HUNGARIAN' 
-    display_game = True #True
+    display_game = False #True
 
     print("Playing...")
 
@@ -479,19 +587,21 @@ def play_game():
             
             
             # Compute optimal velocity from HJ equation if within reachability set
-            phi, dphi_norm, x_dphi, y_dphi = forward_reachable_set(P[p_ind], x_field, y_field, v_field, u_field, dt, t)
-            P[p_ind].reachability_front = phi
+            vx, vy = dphi_norm_history, x_dphi_history, y_dphi_history, T = forward_reachable_set(P[p_ind], e, x_field, y_field, v_field, u_field, dt, t)
+            breakpoint()
+            #P[p_ind].reachability_front = phi
             
-            if is_within_reachable(E[e_ind], x_field, y_field, phi):
-                vxf, vyf = toc(phi, dphi_norm, x_dphi, y_dphi)
-                print("velocity commands:")
-                #breakpoint()
-                if not math.isnan(vxf[int(P[p_ind].x + dim), int(P[p_ind].y + dim)]):
-                    vx = vxf[int(P[p_ind].x + dim), int(P[p_ind].y + dim)] # something wrong here maybe, dim is 61, close enough for dim/2
-                    print(vx)
-                if not math.isnan(vyf[int(P[p_ind].x + dim), int(P[p_ind].y + dim)]):
-                    vy = vyf[int(P[p_ind].x + dim), int(P[p_ind].y + dim)]
-                    print(vy)
+            # if is_within_reachable(E[e_ind], x_field, y_field, phi):
+            #     vxf, vyf = toc(phi, dphi_norm, x_dphi, y_dphi)
+
+            #     print("velocity commands:")
+            #     #breakpoint()
+            #     if not math.isnan(vxf[int(P[p_ind].x + dim), int(P[p_ind].y + dim)]):
+            #         vx = vxf[int(P[p_ind].x + dim), int(P[p_ind].y + dim)] # something wrong here maybe, dim is 61, close enough for dim/2
+            #         print(vx)
+            #     if not math.isnan(vyf[int(P[p_ind].x + dim), int(P[p_ind].y + dim)]):
+            #         vy = vyf[int(P[p_ind].x + dim), int(P[p_ind].y + dim)]
+            #         print(vy)
                 
             P[p_ind].vx = vx
             P[p_ind].vy = vy
