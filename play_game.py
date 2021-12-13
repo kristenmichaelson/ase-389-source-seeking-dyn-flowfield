@@ -7,6 +7,7 @@ import pygame
 import time
 from scipy.optimize import linear_sum_assignment
 from math import hypot, atan2, sin, cos, pi
+import copy
 
 # global variables
 n = 7 # number of pursuers (0 to n-1)
@@ -18,7 +19,7 @@ round_ = 1
 cen_list = [(7 + round_ - 1, 7+ round_ - 1), (42 - round_ + 1, 45 - round_ + 1), (6 + round_ - 1, 45 - round_ + 1)]    
 ratio_list = [0.95/5.0, 0.15/5.0, 1.35/5.0]
 
-F = 0.75 # velocity of vehicle relative to flow field
+F = 0.5 # velocity of vehicle relative to flow field
 
 class Evader():
     def __init__(self, x, y, id, size=1):
@@ -315,7 +316,7 @@ def forward_reachable_set(p, e, x_field, y_field, v_field, u_field, dt, t):
 
     # initialization 
     
-    iterations = 25
+    iterations = 55
 
     x_phi, y_phi = np.meshgrid(np.linspace(-dim,dim,2*dim+1),np.linspace(-dim,dim,2*dim+1))
     x_phi = x_phi - p.x 
@@ -397,15 +398,17 @@ def forward_reachable_set(p, e, x_field, y_field, v_field, u_field, dt, t):
 
         T = T+1
         if is_within_reachable(e, x_field,y_field, phi):
+            p.reachability_front = phi
+            print('success')
             return toc(p, e, x_field, y_field, v_field, u_field, dphi_norm_history, x_dphi_history, y_dphi_history, T, dt)
 
-        plt.quiver(x_field,y_field,u_field,v_field)
+        #plt.quiver(x_field,y_field,u_field,v_field)
         #plt.quiver(x_field,y_field,field_dphi)
         #plt.quiver(x_field,y_field,dphi_norm)
-        plt.scatter(p.x,p.y)
-        plt.scatter(e.x,e.y)
-        plt.contour(x_field,y_field,phi,0)
-        plt.title(k)
+        #plt.scatter(p.x,p.y)
+        #plt.scatter(e.x,e.y)
+        #plt.contour(x_field,y_field,phi,0)
+        #plt.title(k)
         #plt.clf()
         #plt.show()
         #breakpoint()
@@ -430,25 +433,40 @@ def is_within_reachable(e, x_field,y_field, phi):
 def toc(p, e, x_field, y_field, v_field, u_field, dphi_norm_history, x_dphi_history, y_dphi_history, T, dt):
     
     # backtracking
-    yfx, yfy = e.x, e.y
+    yfx, yfy = copy.deepcopy(e.x), copy.deepcopy(e.y)
+    xp_star = []
+    xpdt_star = []
+    xp_star.append((yfx, yfy))
+    xpdt_star.append((0.0, 0.0))
+    dphi_norm = np.sqrt( y_dphi_history[-1][1]**2 + x_dphi_history[-1][1]**2)
     for k in range(1,T+1):
 
         # update x_dphi and dphi_norm with time 
         y_dphi = y_dphi_history[-k][1]
         x_dphi = x_dphi_history[-k][1]
         #dphi_norm = dphi_norm_history[-k][1]
-        dphi_norm = np.sqrt(x_dphi**2 + y_dphi**2)
-
+        #dphi_norm = np.sqrt(x_dphi**2 + y_dphi**2)
+        #xdphi_norm = np.sqrt(x_dphi**2)
+        #ydphi_norm = np.sqrt(y_dphi**2)
+        
+        # TODO: have to normalize properly
         vx = -v_field[int(yfx + dim), int(yfy + dim)] - F * x_dphi[int(yfx + dim), int(yfy + dim)] * 1/(dphi_norm[int(yfx + dim), int(yfy + dim)])
         vy = -u_field[int(yfx + dim), int(yfy + dim)] - F * y_dphi[int(yfx + dim), int(yfy + dim)] * 1/(dphi_norm[int(yfx + dim), int(yfy + dim)])
-        
-        print("Velocities:", vx, vy)
-        yfx, yfy = yfx-vx*dt, yfy-vy*dt
-        print("Positions:", yfx, yfy)
-        #plt.scatter(yfx,yfy)
-        #plt.show()
-        #breakpoint()
-    return vx,vy
+        yfx, yfy = yfx+vx*dt, yfy+vy*dt
+        xp_star.append((yfx, yfy))
+        xpdt_star.append((vx,vy))
+    
+    # reversing optimal velocities for forward propagation
+    xpdt_star = xpdt_star[::-1] 
+    #print("Velocities:", vx, vy)
+    #print("Positions After:", yfx, yfy)
+    #plt.scatter(yfx,yfy)
+    #plt.show()
+    
+    return xpdt_star
+
+    # replace by matrxix equations? file:///C:/Users/caee-hi2369/Downloads/OD_1_Revision_p1_t1.pdf
+    # project vx and vy to find xx and xy using Lolla 2012 projection
 
 def time_to_capture(p,e):
     ## Assumed they moved in same direction/ flow field direction
@@ -467,11 +485,16 @@ def time_reachability(P,E):
             time_matrix[ii][jj] = time_to_capture(P[ii],E[jj])
     return time_matrix
 
+def col_cycler(cols):
+    count = 0
+    while True:
+        yield cols[count]
+        count = (count + 1)%len(cols)
 
 def play_game():
     flowfield_mode = 'ON' # flowfield mode: 'ON' or 'OFF'
     task_assign_mode = 'HUNGARIAN' # task assignment mode: 'ZAVLANOS' or 'HUNGARIAN' 
-    display_game = True #True
+    display_game = False #True
 
     print("Playing...")
 
@@ -511,13 +534,8 @@ def play_game():
 
     dt = 1
 
-    
-
     function = lambda x, y: (-sin(y), x)
     h = VectorField(function,int(dim/2), 0.5,50)
-
-
-
     
     # setting up flow field
     #u, v = vel_form(cen_list, dim, ratio_list)
@@ -528,17 +546,13 @@ def play_game():
         # x_field, y_field, u_field, v_field = circular_velocity_field(int(dim/2), 0.0)
         x_field, y_field, u_field, v_field = circular_velocity_field(0.0)
 
-    
-    # use u and v to update position of purusers and evaders. 
-    #plt.quiver(x_field,y_field,u_field,v_field)
-    #plt.show()
-    #breakpoint()
+
 
     is_game_over = False
-    
+    xp_star_i = []
     t0 = 0.0
     t = t0
-    plt.plot()
+    #plt.plot()
     while not is_game_over:
 
         for event in pygame.event.get():
@@ -563,70 +577,66 @@ def play_game():
             time_matrix = time_reachability(P,E)
             ###%%%% TODO: MAKE ASSIGNMENTS WITH THIS MATRIX %%%%###
 
-        # Check assignments
-        '''
-        ii =  1
-        for pursuer in P:
-            print("Pursuer ", ii ," location: ", pursuer.x, pursuer.y, "Pursuer Assignment",pursuer.I_a, pursuer.I_t )
-            ii = ii + 1
-        ii =  1
-        for evader in E:
-            print("Evader ", ii ," location: ", evader.x, evader.y, "Pursuer Assignment",evader.ID)
-            ii = ii + 1
-        '''
+
         # Integrate dynamics
         for p_ind, e_ind in A:
-            e = E[e_ind]
+            
+            ##########################################################
+
             # Compute optimal velocity using Zavlanos method
-            #vx, vy = P[p_ind].vel(e.x, e.y, t, t0) 
+            # vx, vy = P[p_ind].vel(e.x, e.y, t, t0) 
             
             # Add in flowfield velocities
-            #print("pursuer's location:", P[p_ind].x, P[p_ind].y)
+            # print("pursuer's location:", P[p_ind].x, P[p_ind].y)
             # vx = v_field[int(P[p_ind].x + dim), int(P[p_ind].y + dim)] 
             # vy = u_field[int(P[p_ind].x + dim), int(P[p_ind].y + dim)]
             
-            
+            ###########################################################
+
             # Compute optimal velocity from HJ equation if within reachability set
-            vx, vy = forward_reachable_set(P[p_ind], e, x_field, y_field, v_field, u_field, dt, t)
-            #breakpoint()
-            #P[p_ind].reachability_front = phi
-            
-            # if is_within_reachable(E[e_ind], x_field, y_field, phi):
-            #     vxf, vyf = toc(phi, dphi_norm, x_dphi, y_dphi)
+            #vx, vy = forward_reachable_set(P[p_ind], E[e_ind], x_field, y_field, v_field, u_field, dt, t)
 
-            #     print("velocity commands:")
-            #     #breakpoint()
-            #     if not math.isnan(vxf[int(P[p_ind].x + dim), int(P[p_ind].y + dim)]):
-            #         vx = vxf[int(P[p_ind].x + dim), int(P[p_ind].y + dim)] # something wrong here maybe, dim is 61, close enough for dim/2
-            #         print(vx)
-            #     if not math.isnan(vyf[int(P[p_ind].x + dim), int(P[p_ind].y + dim)]):
-            #         vy = vyf[int(P[p_ind].x + dim), int(P[p_ind].y + dim)]
-            #         print(vy)
-                
-            P[p_ind].vx = vx
-            P[p_ind].vy = vy
-            P[p_ind].move(vx, vy, dt)
+            # P[p_ind].vx = vx
+            # P[p_ind].vy = vy
+            # P[p_ind].move(vx, vy, dt)
         
-        plt.quiver(x_field,y_field,u_field,v_field)
-        for i in range(m):
-            plt.scatter(E[i].x,E[i].y,  marker='*')
-        for i in range(n):
-            plt.scatter(P[i].x,P[i].y,  marker='^')
-        for ii in range(n):
-            plt.contour(x_field,y_field,P[ii].reachability_front,0)
-        #plt.show()
+            xp_star_i.append(forward_reachable_set(P[p_ind], E[e_ind], x_field, y_field, v_field, u_field, dt, t))
+        
+        # select the longest trajectory
+        traj_len = 0 
+        for xp_star_ii in xp_star_i:
+            if len(xp_star_ii) > traj_len:
+                traj_len = len(xp_star_ii)
 
-        for ii in range(m):
-            if flowfield_mode == 'OFF':
-                vx, vy = E[ii].vel() # move along a circle
-                E[ii].move(vx, vy, dt)
-            else:
-                #breakpoint()
-                #print("evader's location:", E[ii].x, E[ii].y)
-                E[ii].move(v_field[int(E[ii].x + dim), int(E[ii].y + dim)], u_field[int(E[ii].x + dim), int(E[ii].y + dim)], dt)
+        for ii in range(traj_len):
+            for p_ind, e_ind in A:
+                if len(xp_star_i[p_ind]) > ii:
+                    P[p_ind].vx = xp_star_i[p_ind][0][0]
+                    P[p_ind].vy = xp_star_i[p_ind][0][1]
+                    P[p_ind].move(-xp_star_i[p_ind][0][0], -xp_star_i[p_ind][0][1], dt)
+                    print('success: ', p_ind)
+                else:
+                    P[p_ind].move(0.0, 0.0, dt)
+
+            plt.quiver(x_field,y_field,u_field,v_field)
+            for pur in P:
+                plt.scatter(pur.x, pur.y)
+            for eva in E:
+                plt.scatter(eva.x, eva.y,marker = 's')
+            plt.show()
+
+        breakpoint()
+        # for ii in range(m):
+        #     if flowfield_mode == 'OFF':
+        #         vx, vy = E[ii].vel() # move along a circle
+        #         E[ii].move(vx, vy, dt)
+        #     else:
+        #         #breakpoint()
+        #         #print("evader's location:", E[ii].x, E[ii].y)
+        #         E[ii].move(v_field[int(E[ii].x + dim), int(E[ii].y + dim)], u_field[int(E[ii].x + dim), int(E[ii].y + dim)], dt)
                 
-                # something like: E[ii].move(vx + v_field[E[ii].x], vy + u_field[E[ii].y], dt)
-                # check if the dimensions of velocity field is same as dimensions (and range of axis) to the grid for pursuers and evaders that Kristen coded
+        #         # something like: E[ii].move(vx + v_field[E[ii].x], vy + u_field[E[ii].y], dt)
+        #         # check if the dimensions of velocity field is same as dimensions (and range of axis) to the grid for pursuers and evaders that Kristen coded
 
         # Visualize
         if display_game:
